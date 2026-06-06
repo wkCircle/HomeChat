@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import apiFetch from './api';
 import { StreamTypeEnum } from './types';
 import type { ChatMessage, MessagePart, StreamEvent } from './types';
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
 
 function randomId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -47,7 +46,7 @@ export function useChat({
       setError(null);
 
       try {
-        const response = await fetch(`${BACKEND_URL}/api/chat/stream`, {
+        const response = await apiFetch('/api/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -63,8 +62,12 @@ export function useChat({
           }),
         });
 
-        if (!response.ok || !response.body) {
+        if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        if (!response.body) {
+          throw new Error('No response body');
         }
 
         const reader = response.body.getReader();
