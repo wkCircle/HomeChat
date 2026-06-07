@@ -139,7 +139,7 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
         className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-indigo-100 ring-1 ring-transparent outline-none transition focus-visible:ring-indigo-400"
         aria-label="View agent portrait"
       >
-        <Image src="/avatars/pikachu_redsofa_1.jpeg" alt="Agent portrait" width={28} height={28} className="h-full w-full object-cover" priority />
+        <Image src="/avatars/pikachu_redsofa_2.jpeg" alt="Agent portrait" width={28} height={28} className="h-full w-full object-cover" priority />
       </button>
       <div className="max-w-2xl space-y-1">
         {msg.parts.map((part, i) => {
@@ -226,7 +226,7 @@ export function MessageList({ messages, isLoading }: { messages: ChatMessage[]; 
       <AvatarModal
         open={isAvatarOpen}
         onClose={() => setIsAvatarOpen(false)}
-        src="/avatars/pikachu_redsofa_1.jpeg"
+        src="/avatars/pikachu_redsofa_2.jpeg"
         alt="Agent portrait large"
       />
     </div>
