@@ -2,6 +2,10 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import rehypeKatex from 'rehype-katex';
 import { StreamTypeEnum } from '@/lib/types';
 import ArtifactRenderer from './ArtifactRenderer';
 import type {
@@ -98,8 +102,13 @@ function AssistantMessage({ msg, isLoading }: { msg: ChatMessage; isLoading?: bo
           switch (part.type) {
             case StreamTypeEnum.TEXT:
               return (
-                <div key={i} className="prose prose-sm max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{part.text}</ReactMarkdown>
+                <div key={i} className="prose prose-sm max-w-none dark:prose-invert">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+                  >
+                    {part.text}
+                  </ReactMarkdown>
                 </div>
               );
             case StreamTypeEnum.REASONING:

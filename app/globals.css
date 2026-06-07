@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+/* KaTeX CSS is imported in app/layout.tsx to satisfy @import ordering rules */
+
 /* Dark mode base overrides */
 @layer base {
   body {
