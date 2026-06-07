@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from 'next/dynamic';
+import { useState } from 'react';
 import { StreamTypeEnum } from '@/lib/types';
 
 // Plotly must run client-side; disable SSR
@@ -139,8 +140,77 @@ export default function ArtifactRenderer({
       const tableBorder = bordered ? 'border border-gray-200' : '';
       const trBase = `${striped ? 'odd:bg-white even:bg-gray-50' : ''} ${hover ? 'hover:bg-gray-100' : ''}`.trim();
 
+      // CSV helpers
+      const escapeCsv = (val: any) => {
+        const s = val == null ? '' : String(val);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const csvHeader = columnLabels.map(escapeCsv).join(',');
+      const csvBody = rows.map((r) => r.map(escapeCsv).join(',')).join('\r\n');
+      const csv = csvHeader + (rows.length ? '\r\n' + csvBody : '');
+      const filename = ((title || 'table').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'table') + '.csv';
+
+      const [copied, setCopied] = useState(false);
+      const doCopy = async () => {
+        try {
+          await navigator.clipboard.writeText(csv);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          // fallback
+          const ta = document.createElement('textarea');
+          ta.value = csv;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }
+      };
+      const doDownload = () => {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      };
+
       return (
         <div className={`${responsive ? 'overflow-auto' : ''} rounded border border-gray-200`}>
+          {/* Toolbar that shares scroll width with the table */}
+          <div className="min-w-full flex items-center justify-end gap-1 border-b bg-gray-50 px-2 py-1">
+            <button
+              type="button"
+              onClick={doCopy}
+              title={copied ? 'Copied!' : 'Copy as CSV'}
+              aria-label="Copy as CSV"
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100"
+            >
+              {/* Copy icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 7.5V6A2.25 2.25 0 0 1 10.5 3.75h7.5A2.25 2.25 0 0 1 20.25 6v9A2.25 2.25 0 0 1 18 17.25h-1.5M8.25 7.5H6A2.25 2.25 0 0 0 3.75 9.75v7.5A2.25 2.25 0 0 0 6 19.5h7.5A2.25 2.25 0 0 0 15.75 17.25v-1.5" />
+              </svg>
+              <span>{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={doDownload}
+              title="Download CSV"
+              aria-label="Download CSV"
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100"
+            >
+              {/* Download icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M7.5 10.5 12 15m0 0 4.5-4.5M12 15V3" />
+              </svg>
+              <span>Download</span>
+            </button>
+          </div>
           <table className={`min-w-full text-left ${textSize} ${tableBorder}`}>
             {title ? (
               <caption className="caption-top border-b bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 text-left">
