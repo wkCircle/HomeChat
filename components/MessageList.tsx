@@ -3,6 +3,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { StreamTypeEnum } from '@/lib/types';
+import ArtifactRenderer from './ArtifactRenderer';
 import type {
   ChatMessage,
   FuncCallEndPart,
@@ -61,16 +62,10 @@ function FuncCallEndBlock({ part }: { part: FuncCallEndPart }) {
 }
 
 function ArtifactBlock({ part }: { part: UIPart | InteractivePart }) {
-  // Placeholder — swap with your own component once you know the artifact shape.
   return (
-    <details className="my-2 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs">
-      <summary className="cursor-pointer font-medium text-blue-700 select-none">
-        {part.type === StreamTypeEnum.INTERACTIVE ? '🖱 Interactive block' : '📊 UI block'}
-      </summary>
-      <pre className="mt-1 max-h-60 overflow-auto text-blue-900">
-        {JSON.stringify(part.artifact, null, 2)}
-      </pre>
-    </details>
+    <div className="my-2">
+      <ArtifactRenderer artifact={part.artifact} kind={part.type} />
+    </div>
   );
 }
 
