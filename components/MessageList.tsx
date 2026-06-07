@@ -1,5 +1,7 @@
 'use client';
 
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -20,6 +22,43 @@ import type {
 export type { ChatMessage };
 
 // ─── Part renderers ───────────────────────────────────────────────────────────
+
+function AvatarModal({ open, onClose, src, alt }: { open: boolean; onClose: () => void; src: string; alt: string }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={onClose}
+      aria-modal="true"
+      role="dialog"
+    >
+      <div
+        className="relative max-h-[85vh] max-w-[90vw] rounded-xl bg-white/5 p-2 shadow-2xl backdrop-blur dark:bg-black/20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative h-[min(70vh,560px)] w-[min(90vw,560px)]">
+          <Image src={src} alt={alt} fill className="rounded-lg object-contain" priority />
+        </div>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute -right-2 -top-2 rounded-full bg-white p-1 text-gray-700 shadow dark:bg-gray-800 dark:text-gray-200"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function ReasoningBlock({ text }: { text: string }) {
   return (
@@ -84,7 +123,7 @@ function MonitorBlock({ part }: { part: MonitorPart }) {
 
 // ─── Single message ───────────────────────────────────────────────────────────
 
-function AssistantMessage({ msg, isLoading }: { msg: ChatMessage; isLoading?: boolean }) {
+function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage; isLoading?: boolean; onAvatarClick?: () => void }) {
   // Build set of tool_call_ids that have a matching func_call_end part
   const resolvedIds = new Set(
     msg.parts
@@ -94,9 +133,14 @@ function AssistantMessage({ msg, isLoading }: { msg: ChatMessage; isLoading?: bo
 
   return (
     <div className="flex gap-3">
-      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-xs font-bold text-white">
-        AI
-      </div>
+      <button
+        type="button"
+        onClick={onAvatarClick}
+        className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-indigo-100 ring-1 ring-transparent outline-none transition focus-visible:ring-indigo-400"
+        aria-label="View agent portrait"
+      >
+        <Image src="/avatars/pikachu_redsofa_1.jpeg" alt="Agent portrait" width={28} height={28} className="h-full w-full object-cover" priority />
+      </button>
       <div className="max-w-2xl space-y-1">
         {msg.parts.map((part, i) => {
           switch (part.type) {
@@ -163,6 +207,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
 // ─── List ─────────────────────────────────────────────────────────────────────
 
 export function MessageList({ messages, isLoading }: { messages: ChatMessage[]; isLoading?: boolean }) {
+  const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   return (
     <div className="space-y-4">
       {messages.map((msg, i) => {
@@ -170,9 +215,20 @@ export function MessageList({ messages, isLoading }: { messages: ChatMessage[]; 
         return msg.role === 'user' ? (
           <UserMessage key={msg.id} msg={msg} />
         ) : (
-          <AssistantMessage key={msg.id} msg={msg} isLoading={isLastMsg ? isLoading : false} />
+          <AssistantMessage
+            key={msg.id}
+            msg={msg}
+            isLoading={isLastMsg ? isLoading : false}
+            onAvatarClick={() => setIsAvatarOpen(true)}
+          />
         );
       })}
+      <AvatarModal
+        open={isAvatarOpen}
+        onClose={() => setIsAvatarOpen(false)}
+        src="/avatars/pikachu_redsofa_1.jpeg"
+        alt="Agent portrait large"
+      />
     </div>
   );
 }
