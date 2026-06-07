@@ -78,20 +78,61 @@ export default function ArtifactRenderer({
 
   // Simple tables
   if (type === 'table') {
-    const columns = (artifact['columns'] as string[]) ?? [];
-    const rows = (artifact['rows'] as unknown[][]) ?? [];
-    if (columns.length && rows.length) {
+    // Some tools wrap the actual payload under 'data'
+    const payload = ((artifact['data'] as Record<string, unknown>) ?? artifact) as Record<string, unknown>;
+    const title = (payload['title'] as string) || '';
+    const props = (payload['props'] as Record<string, unknown>) || {};
+    const rawColumns = (payload['columns'] as any[]) ?? [];
+    const rawRows = (payload['rows'] as any[]) ?? [];
+
+    if (rawColumns.length && rawRows.length) {
+      type Col = string | { key?: string; label?: string };
+      const columnKeys: string[] = rawColumns.map((c: Col, i: number) => {
+        if (typeof c === 'string') return c;
+        if (c && typeof c === 'object') return c.key ?? c.label ?? String(i);
+        return String(i);
+      });
+      const columnLabels: string[] = rawColumns.map((c: Col, i: number) => {
+        if (typeof c === 'string') return c;
+        if (c && typeof c === 'object') return c.label ?? c.key ?? String(i);
+        return String(i);
+      });
+
+      // Normalize rows to array-of-arrays in column order
+      const rows: any[][] = Array.isArray(rawRows[0])
+        ? (rawRows as any[][])
+        : (rawRows as Record<string, any>[]).map((r) => columnKeys.map((k) => r?.[k]));
+
+      const striped = Boolean(props['striped']);
+      const hover = Boolean(props['hover']);
+      const bordered = Boolean(props['bordered']);
+      const responsive = props['responsive'] !== false; // default true
+      const size = (props['size'] as string) || 'sm';
+
+      const textSize = size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-sm' : 'text-xs';
+      const tableBorder = bordered ? 'border border-gray-200' : '';
+      const trBase = `${striped ? 'odd:bg-white even:bg-gray-50' : ''} ${hover ? 'hover:bg-gray-100' : ''}`.trim();
+
       return (
-        <div className="overflow-auto rounded border border-gray-200">
-          <table className="min-w-full text-left text-xs">
+        <div className={`${responsive ? 'overflow-auto' : ''} rounded border border-gray-200`}>
+          <table className={`min-w-full text-left ${textSize} ${tableBorder}`}>
+            {title ? (
+              <caption className="caption-top border-b bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 text-left">
+                {title}
+              </caption>
+            ) : null}
             <thead className="bg-gray-50 text-gray-600">
-              <tr>{columns.map((c, i) => (<th key={i} className="px-2 py-1 font-medium">{c}</th>))}</tr>
+              <tr>
+                {columnLabels.map((label, i) => (
+                  <th key={i} className={`px-2 py-1 font-medium ${bordered ? 'border border-gray-200' : ''}`}>{label}</th>
+                ))}
+              </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className={`text-gray-700 ${bordered ? 'border-t border-gray-200' : ''}`}>
               {rows.map((r, i) => (
-                <tr key={i} className="odd:bg-white even:bg-gray-50">
+                <tr key={i} className={trBase}>
                   {r.map((cell, j) => (
-                    <td key={j} className="px-2 py-1 text-gray-700">{String(cell)}</td>
+                    <td key={j} className={`px-2 py-1 align-top ${bordered ? 'border border-gray-200' : ''}`}>{String(cell)}</td>
                   ))}
                 </tr>
               ))}
