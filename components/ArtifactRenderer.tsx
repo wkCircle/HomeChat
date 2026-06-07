@@ -18,14 +18,20 @@ function isHttpUrl(url?: string): boolean {
   }
 }
 
-function PlotlyGraph({ figure }: { figure: any }) {
+function PlotlyGraph({ figure, style, responsive, config }: { figure: any; style?: Record<string, any>; responsive?: boolean; config?: any }) {
   const data = figure?.data ?? [];
   const layout = figure?.layout ?? { autosize: true, margin: { t: 30, r: 10, b: 40, l: 40 } };
-  const config = figure?.config ?? { displayModeBar: true, responsive: true };
+  const finalConfig = config ?? figure?.config ?? { displayModeBar: true, responsive: true };
   return (
     <div className="w-full">
       {/* @ts-ignore - react-plotly.js types */}
-      <Plot data={data} layout={layout} config={config} style={{ width: '100%', height: '100%' }} useResizeHandler />
+      <Plot
+        data={data}
+        layout={layout}
+        config={finalConfig}
+        style={{ width: '100%', height: '100%', ...(style || {}) }}
+        useResizeHandler={responsive ?? true}
+      />
     </div>
   );
 }
@@ -45,15 +51,35 @@ export default function ArtifactRenderer({
     if (renderer === 'plotly') {
       const format = (artifact['format'] as string) || 'json';
       if (format === 'json') {
-        // data can be a JSON string or an already-parsed object with {data, layout, config}
+        // Support multiple shapes:
+        // 1) data is a JSON string of {data, layout, config}
+        // 2) data is an object {data, layout, config}
+        // 3) data is an object { props: { figure: string|object, responsive?: bool, config?: object, style?: object } }
         const raw = artifact['data'];
         let figure: any = undefined;
+        let responsive: boolean | undefined;
+        let configOverride: any | undefined;
+        let style: Record<string, any> | undefined;
+
         if (typeof raw === 'string') {
-          try { figure = JSON.parse(raw); } catch { /* fall through */ }
+          try { figure = JSON.parse(raw); } catch { /* ignore */ }
         } else if (raw && typeof raw === 'object') {
-          figure = raw;
+          const maybeProps = (raw as Record<string, any>).props;
+          if (maybeProps && typeof maybeProps === 'object') {
+            const f = (maybeProps as any).figure;
+            if (typeof f === 'string') {
+              try { figure = JSON.parse(f); } catch { /* ignore */ }
+            } else if (f && typeof f === 'object') {
+              figure = f;
+            }
+            responsive = (maybeProps as any).responsive ?? true;
+            configOverride = (maybeProps as any).config;
+            style = (maybeProps as any).style;
+          } else {
+            figure = raw;
+          }
         }
-        if (figure) return <PlotlyGraph figure={figure} />;
+        if (figure) return <PlotlyGraph figure={figure} responsive={responsive} config={configOverride} style={style} />;
       }
       // html format
       if (artifact['html'] && typeof artifact['html'] === 'string') {
