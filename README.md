@@ -45,7 +45,7 @@ cp .env.local.example .env.local
 Edit `.env.local`:
 
 ```env
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8082
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8010
 ```
 
 **3. Run the development server**
