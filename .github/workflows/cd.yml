@@ -14,6 +14,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Detect changed paths
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            app:
+              - 'app/**'
+              - 'components/**'
+              - 'lib/**'
+              - 'public/**'
+              - 'Dockerfile'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig.json'
+              - 'next.config.*'
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -36,6 +52,7 @@ jobs:
 
       - name: Build and push HomeChat
         uses: docker/build-push-action@v5
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.app == 'true'
         with:
           context: .
           file: Dockerfile
