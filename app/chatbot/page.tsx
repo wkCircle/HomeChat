@@ -50,8 +50,7 @@ export default function ChatPage() {
           <button
             onClick={async () => {
               try {
-                const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || '';
-                await fetch(`${BACKEND_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
+                await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' });
               } finally {
                 window.location.href = '/login';
               }

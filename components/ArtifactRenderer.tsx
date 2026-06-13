@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { StreamTypeEnum } from '@/lib/types';
 
 // Plotly must run client-side; disable SSR
-const Plot = dynamic(() => import('react-plotly.js'), { ssr: false, loading: () => (
+// Explicit generic loosens prop typing so TS doesn't complain about Plot props
+const Plot = dynamic<any>(() => import('react-plotly.js'), { ssr: false, loading: () => (
   <div className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">Loading chart…</div>
 )});
 

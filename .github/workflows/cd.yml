@@ -8,6 +8,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    environment: prod
     permissions:
       contents: read
       packages: write
@@ -57,5 +58,7 @@ jobs:
           context: .
           file: Dockerfile
           platforms: linux/amd64
+          build-args: |
+            NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
           push: true
           tags: ghcr.io/${{ env.IMAGE_OWNER }}/homechat:latest
