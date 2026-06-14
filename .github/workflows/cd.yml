@@ -33,6 +33,7 @@ jobs:
               - 'package-lock.json'
               - 'tsconfig.json'
               - 'next.config.*'
+              - '.github/workflows/cd.yml'
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
