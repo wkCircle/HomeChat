@@ -1,67 +1,72 @@
-# Home Agent — Frontend
+# Home Agent — Frontend (HomeChat)
 
 A Next.js chat UI that streams responses from the Home Agent FastAPI backend.
 
+This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the browser always calls the UI origin (`/api/...`). The proxy forwards to the backend using a runtime environment variable, which means you don’t need client-side `NEXT_PUBLIC_*` variables.
+
 ---
 
-## Folder Structure
+## Project Layout
 
 ```
-front-end/
-├── .env.local.example        # environment variable template
-├── package.json
-├── tsconfig.json
-├── next.config.ts
-├── tailwind.config.ts
-├── postcss.config.js
+HomeChat/
 ├── app/
-│   ├── globals.css           # Tailwind base styles
-│   ├── layout.tsx            # root layout (metadata, body wrapper)
-│   └── page.tsx              # chat UI: header + scrollable message area + input
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── api/[...path]/route.ts   # reverse proxy to backend (runtime)
 ├── components/
-│   └── MessageList.tsx       # renders all backend event types as message parts
-└── lib/
-    ├── types.ts              # TypeScript types mirroring source/lib/fastapi/schema.py
-    └── useChat.ts        # core hook: fetch + NDJSON stream parser + chat state
+│   ├── ArtifactRenderer.tsx
+│   ├── MessageList.tsx
+│   └── SettingsPanel.tsx
+├── lib/
+│   ├── api.ts                    # uses relative /api paths
+│   ├── types.ts
+│   └── useChat.ts                # NDJSON stream handling
+├── public/
+├── next.config.ts                # no build-time API rewrites
+├── package.json
+└── Dockerfile
 ```
 
 ---
 
-## Getting Started
+## Local Development
 
-**1. Install dependencies**
+1) Install deps
 
-```sh
-cd front-end
+```bash
 npm install
 ```
 
-**2. Configure the backend URL**
+2) Start dev server
 
-```sh
-cp .env.local.example .env.local
-```
-
-Edit `.env.local`:
-
-```env
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8010
-```
-
-**3. Run the development server**
-
-```sh
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open http://localhost:3000. By default, the proxy will try `http://localhost:8010` if no runtime env is provided.
 
-**4. Build for production**
+---
 
-```sh
+## Production Build
+
+```bash
 npm run build
-npm start
+npm run start
 ```
+
+When running in Docker (recommended), the proxy reads `BACKEND_INTERNAL_URL` at runtime from `docker-compose.yml` and forwards to the backend (for example `http://home_ai:8010`).
+
+---
+
+## Configuration
+
+- Backend target (runtime): set `BACKEND_INTERNAL_URL` in your Compose for the `home_chat` service, e.g. `http://home_ai:8010`.
+- No client env needed: `NEXT_PUBLIC_BACKEND_URL` is not used.
+- Logs: reverse proxy logs network errors to stdout/stderr (visible via `docker logs home_chat`).
+
+Optional local override: you can still create `.env.local` for other Next.js settings, but it is not required for the backend URL.
 
 ---
 
