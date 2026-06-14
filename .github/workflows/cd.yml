@@ -64,4 +64,4 @@ jobs:
           build-args: |
             NEXT_PUBLIC_BACKEND_URL=${{ vars.NEXT_PUBLIC_BACKEND_URL }}
           push: true
-          tags: ghcr.io/${{ env.IMAGE_OWNER }}/homechat:latest
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/home_chat:latest
