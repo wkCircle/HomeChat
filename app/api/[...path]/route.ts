@@ -49,10 +49,21 @@ async function proxy(
 
     const respHeaders = new Headers();
     // pass through content-type and cache headers commonly used
-    const pass = ['content-type', 'cache-control', 'pragma'];
+    const pass = ['content-type', 'cache-control', 'pragma', 'www-authenticate', 'location'];
     for (const k of pass) {
       const v = upstream.headers.get(k);
       if (v) respHeaders.set(k, v);
+    }
+
+    // Forward Set-Cookie (can be multiple). Different runtimes surface this differently.
+    const anyHeaders = upstream.headers as any;
+    const setCookies: string[] | undefined =
+      typeof anyHeaders.getSetCookie === 'function' ? anyHeaders.getSetCookie() : undefined;
+    if (Array.isArray(setCookies) && setCookies.length) {
+      for (const c of setCookies) respHeaders.append('set-cookie', c);
+    } else {
+      const one = upstream.headers.get('set-cookie');
+      if (one) respHeaders.append('set-cookie', one);
     }
 
     return new Response(upstream.body, {
