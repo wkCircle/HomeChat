@@ -14,11 +14,27 @@ export default function ChatPage() {
 
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Autosize textarea height up to a maximum, then allow internal scrolling
+  const adjustTextareaHeight = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    const maxHeight = 160; // px, approx 6-8 lines depending on font
+    const newHeight = Math.min(ta.scrollHeight, maxHeight);
+    ta.style.height = `${newHeight}px`;
+    ta.style.overflowY = ta.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,7 +80,11 @@ export default function ChatPage() {
       </header>
 
       {/* Message area */}
-      <main className="flex-1 overflow-y-auto px-4 py-6">
+      <main
+        className="flex-1 overflow-y-auto px-4 py-6"
+        // improve touch scrolling on mobile
+        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
+      >
         <div className="mx-auto max-w-3xl">
           {messages.length === 0 ? (
             <p className="mt-24 text-center text-gray-400">Ask me anything to get started.</p>
@@ -82,12 +102,14 @@ export default function ChatPage() {
       <footer className="border-t bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800">
         <form onSubmit={handleSubmit} className="mx-auto flex max-w-3xl items-end gap-2">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Message Pikachu HomeAI… (Enter to send, Shift+Enter for newline)"
             rows={1}
-            className="flex-1 resize-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
+            className="flex-1 h-auto max-h-40 resize-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
+            onInput={adjustTextareaHeight}
           />
           <button
             type="submit"
