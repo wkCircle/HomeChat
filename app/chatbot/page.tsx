@@ -17,10 +17,14 @@ export default function ChatPage() {
   const mainRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isMobileInputMode, setIsMobileInputMode] = useState(false);
 
-  // Auto-scroll to bottom on new content
+  // Auto-scroll to bottom on new content only if already near bottom
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = mainRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+    if (atBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   // Track scroll to toggle the floating "scroll to bottom" button
@@ -56,6 +60,21 @@ export default function ChatPage() {
     adjustTextareaHeight();
   }, [input]);
 
+  // Detect mobile-like input mode (touch-only pointer). Avoid viewport width heuristics.
+  useEffect(() => {
+    const check = () => {
+      const mobileLike = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+      setIsMobileInputMode(Boolean(mobileLike));
+    };
+    check();
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check as any);
+    return () => {
+      window.removeEventListener('resize', check);
+      window.removeEventListener('orientationchange', check as any);
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const msg = input.trim();
@@ -65,9 +84,19 @@ export default function ChatPage() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as unknown as React.FormEvent);
+    if ((e as any).isComposing || e.key === 'Process') {
+      // IME composition in progress; let Enter confirm composition
+      return;
+    }
+    if (isMobileInputMode) {
+      // On mobile: Enter inserts newline; only button sends
+      return;
+    } else {
+      // Desktop: Enter sends; Shift+Enter newline
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit(e as unknown as React.FormEvent);
+      }
     }
   };
 
@@ -142,7 +171,8 @@ export default function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message Pikachu HomeAI… (Enter to send, Shift+Enter for newline)"
+            placeholder={isMobileInputMode ? 'Message Pikachu HomeAI… (Tap Send to submit; Enter for newline)' : 'Message Pikachu HomeAI… (Enter to send, Shift+Enter for newline)'}
+            enterKeyHint={isMobileInputMode ? 'enter' : 'send'}
             rows={1}
             className="flex-1 h-auto max-h-40 resize-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
             onInput={adjustTextareaHeight}

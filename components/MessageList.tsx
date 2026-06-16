@@ -197,7 +197,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
   const text = msg.parts.find((p) => p.type === 'text')?.text ?? '';
   return (
     <div className="flex justify-end">
-      <div className="max-w-xl rounded-2xl bg-indigo-500 px-4 py-2 text-sm text-white">
+      <div className="max-w-full sm:max-w-xl rounded-2xl bg-indigo-500 px-4 py-2 text-sm text-white break-words whitespace-pre-wrap">
         {text}
       </div>
     </div>

@@ -10,3 +10,31 @@
     @apply bg-gray-100 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
   }
 }
+
+/* Responsive content in markdown and artifacts */
+@layer components {
+  /* Keep markdown content within viewport on mobile */
+  .prose {
+    max-width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+  .prose pre {
+    white-space: pre-wrap; /* wrap long code lines to avoid horizontal scroll */
+    word-break: break-word;
+  }
+  .prose table {
+    display: block; /* allow horizontal scroll container */
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .prose th, .prose td {
+    word-break: break-word;
+    white-space: normal;
+  }
+  .prose img, .prose video, .prose iframe {
+    max-width: 100%;
+    height: auto;
+  }
+}

@@ -24,6 +24,7 @@ function PlotlyGraph({ figure, style, responsive, config }: { figure: any; style
   const data = figure?.data ?? [];
   const layout = figure?.layout ?? { autosize: true, margin: { t: 30, r: 10, b: 40, l: 40 } };
   const finalConfig = config ?? figure?.config ?? { displayModeBar: true, responsive: true };
+  const defaultHeight = (typeof layout?.height === 'number' && layout.height > 0) ? layout.height : 420;
   return (
     // Allow horizontal scroll if layout is wider than viewport
     <div className="w-full max-w-full overflow-x-auto">
@@ -32,7 +33,7 @@ function PlotlyGraph({ figure, style, responsive, config }: { figure: any; style
         data={data}
         layout={layout}
         config={finalConfig}
-        style={{ width: '100%', height: '100%', ...(style || {}) }}
+        style={{ width: '100%', height: defaultHeight, ...(style || {}) }}
         useResizeHandler={responsive ?? true}
       />
     </div>
@@ -78,7 +79,6 @@ export default function ArtifactRenderer({
             responsive = (maybeProps as any).responsive ?? true;
             configOverride = (maybeProps as any).config;
             style = (maybeProps as any).style;
-            figure = raw;
           }
         }
         if (figure) return <PlotlyGraph figure={figure} responsive={responsive} config={configOverride} style={style} />;
@@ -196,7 +196,7 @@ export default function ArtifactRenderer({
       const TableContent = ({ inFullscreen = false }: { inFullscreen?: boolean }) => {
         const visibleRows = rows.slice(startIdx, endIdx);
         return (
-          <div className={`${responsive ? 'overflow-auto' : ''} rounded border border-gray-200`} style={{ touchAction: 'pan-x pan-y' }}>
+          <div className={`w-full max-w-full ${responsive ? 'overflow-auto' : ''} rounded border border-gray-200`} style={{ touchAction: 'pan-x pan-y' }}>            
             {/* Toolbar that shares scroll width with the table */}
             <div className="min-w-full flex items-center justify-between gap-2 border-b bg-gray-50 px-2 py-1">
               {/* Left: actions */}
