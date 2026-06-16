@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import apiFetch from './api';
 import { StreamTypeEnum } from './types';
 import type { ChatMessage, MessagePart, StreamEvent } from './types';
@@ -28,6 +28,36 @@ export function useChat({
   const [error, setError] = useState<string | null>(null);
   // thread_id is stable for the lifetime of this hook instance (one conversation)
   const threadId = useRef<string>(randomId());
+  const STORAGE_KEY = 'homechat:chat:messages';
+  const STORAGE_THREAD_KEY = 'homechat:chat:threadId';
+
+  // Hydrate from localStorage on first mount
+  useEffect(() => {
+    try {
+      const rawMsgs = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+      const rawThread = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_THREAD_KEY) : null;
+      if (rawThread) threadId.current = rawThread;
+      if (rawMsgs) {
+        const parsed = JSON.parse(rawMsgs) as ChatMessage[];
+        if (Array.isArray(parsed)) {
+          setMessages(parsed);
+        }
+      }
+    } catch {
+      // ignore corrupt storage
+    }
+  }, []);
+
+  // Persist to localStorage on changes
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+      localStorage.setItem(STORAGE_THREAD_KEY, threadId.current);
+    } catch {
+      // storage quota exceeded or forbidden — ignore silently for quick fix
+    }
+  }, [messages]);
 
   const append = useCallback(
     async (userMessage: string) => {
@@ -128,6 +158,14 @@ export function useChat({
     setMessages([]);
     setError(null);
     threadId.current = randomId();
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(STORAGE_THREAD_KEY, threadId.current);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
 
   return {

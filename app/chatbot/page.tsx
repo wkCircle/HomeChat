@@ -14,12 +14,32 @@ export default function ChatPage() {
 
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   // Auto-scroll to bottom on new content
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Track scroll to toggle the floating "scroll to bottom" button
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+      setShowScrollToBottom(!atBottom);
+    };
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    const onResize = () => onScroll();
+    window.addEventListener('resize', onResize);
+    return () => {
+      el.removeEventListener('scroll', onScroll as EventListener);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
 
   // Autosize textarea height up to a maximum, then allow internal scrolling
   const adjustTextareaHeight = () => {
@@ -81,11 +101,12 @@ export default function ChatPage() {
 
       {/* Message area */}
       <main
-        className="flex-1 overflow-y-auto px-4 py-6"
-        // improve touch scrolling on mobile
+        ref={mainRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-4 sm:py-6"
+        // Improve touch scrolling on mobile; prevent accidental horizontal panning
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
       >
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl">
           {messages.length === 0 ? (
             <p className="mt-24 text-center text-gray-400">Ask me anything to get started.</p>
           ) : (
@@ -96,11 +117,26 @@ export default function ChatPage() {
           )}
           <div ref={bottomRef} />
         </div>
+
+        {/* Scroll-to-bottom floating button */}
+        {showScrollToBottom && messages.length > 0 && (
+          <button
+            type="button"
+            aria-label="Scroll to latest message"
+            onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
+            className="fixed right-4 bottom-24 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg ring-1 ring-indigo-400/50 hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:right-6"
+          >
+            {/* Down arrow icon */}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+            </svg>
+          </button>
+        )}
       </main>
 
       {/* Input */}
       <footer className="border-t bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800">
-        <form onSubmit={handleSubmit} className="mx-auto flex max-w-3xl items-end gap-2">
+        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-4xl items-end gap-2 lg:max-w-5xl xl:max-w-6xl">
           <textarea
             ref={textareaRef}
             value={input}

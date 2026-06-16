@@ -141,12 +141,12 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
       >
         <Image src="/avatars/pikachu_redsofa_2.jpeg" alt="Agent portrait" width={28} height={28} className="h-full w-full object-cover" priority />
       </button>
-      <div className="max-w-2xl space-y-1">
+      <div className="w-full space-y-1">
         {msg.parts.map((part, i) => {
           switch (part.type) {
             case StreamTypeEnum.TEXT:
               return (
-                <div key={i} className="prose prose-sm max-w-none dark:prose-invert">
+                <div key={i} className="prose prose-sm max-w-full break-words dark:prose-invert prose-pre:whitespace-pre-wrap">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
