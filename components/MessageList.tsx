@@ -66,7 +66,7 @@ function ReasoningBlock({ text }: { text: string }) {
       <summary className="cursor-pointer font-medium text-purple-700 select-none">
         💭 Reasoning
       </summary>
-      <p className="mt-2 whitespace-pre-wrap text-purple-900">{text}</p>
+      <p className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-purple-900">{text}</p>
     </details>
   );
 }
@@ -80,7 +80,7 @@ function FuncCallStartBlock({ part, isResolved }: { part: FuncCallStartPart; isR
           <summary className="cursor-pointer select-none">
             {isResolved ? `Called ${c.name ?? 'unknown'}` : `Calling ${c.name ?? 'unknown'}…`}
           </summary>
-          <pre className="mt-1 max-h-32 overflow-auto rounded bg-gray-100 p-2 text-gray-600">
+          <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded bg-gray-100 p-2 text-gray-600">
             {JSON.stringify(c.args ?? {}, null, 2)}
           </pre>
         </details>
@@ -97,7 +97,7 @@ function FuncCallEndBlock({ part }: { part: FuncCallEndPart }) {
       <summary className={`cursor-pointer font-medium select-none ${color}`}>
         {icon} {part.name} — {part.status}
       </summary>
-      <pre className="mt-1 max-h-40 overflow-auto rounded bg-gray-100 p-2 text-gray-700">
+      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-gray-100 p-2 text-gray-700">
         {typeof part.content === 'string' ? part.content : JSON.stringify(part.content, null, 2)}
       </pre>
     </details>
@@ -132,7 +132,7 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
   );
 
   return (
-    <div className="flex gap-3">
+    <div className="flex min-w-0 gap-3">
       <button
         type="button"
         onClick={onAvatarClick}
@@ -141,12 +141,12 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
       >
         <Image src="/avatars/pikachu_redsofa_2.jpeg" alt="Agent portrait" width={28} height={28} className="h-full w-full object-cover" priority />
       </button>
-      <div className="w-full space-y-1">
+      <div className="min-w-0 flex-1 space-y-1">
         {msg.parts.map((part, i) => {
           switch (part.type) {
             case StreamTypeEnum.TEXT:
               return (
-                <div key={i} className="prose prose-sm max-w-full break-words dark:prose-invert prose-pre:whitespace-pre-wrap">
+                <div key={i} className="prose prose-sm min-w-0 max-w-full break-words dark:prose-invert prose-pre:whitespace-pre-wrap">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
                     rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}

@@ -22,18 +22,34 @@ function isHttpUrl(url?: string): boolean {
 
 function PlotlyGraph({ figure, style, responsive, config }: { figure: any; style?: Record<string, any>; responsive?: boolean; config?: any }) {
   const data = figure?.data ?? [];
-  const layout = figure?.layout ?? { autosize: true, margin: { t: 30, r: 10, b: 40, l: 40 } };
-  const finalConfig = config ?? figure?.config ?? { displayModeBar: true, responsive: true };
+  const sourceLayout = figure?.layout ?? { autosize: true, margin: { t: 30, r: 10, b: 40, l: 40 } };
+  const layout = {
+    ...sourceLayout,
+    autosize: true,
+    width: undefined,
+    margin: {
+      t: 30,
+      r: 12,
+      b: 48,
+      l: 36,
+      ...(sourceLayout?.margin ?? {}),
+    },
+  };
+  const finalConfig = {
+    displayModeBar: true,
+    responsive: true,
+    ...(figure?.config ?? {}),
+    ...(config ?? {}),
+  };
   const defaultHeight = (typeof layout?.height === 'number' && layout.height > 0) ? layout.height : 420;
   return (
-    // Allow horizontal scroll if layout is wider than viewport
-    <div className="w-full max-w-full overflow-x-auto">
+    <div className="artifact-plot-wrapper w-full max-w-full overflow-hidden rounded border border-blue-200 bg-white">
       {/* @ts-ignore - react-plotly.js types */}
       <Plot
         data={data}
         layout={layout}
         config={finalConfig}
-        style={{ width: '100%', height: defaultHeight, ...(style || {}) }}
+        style={{ width: '100%', maxWidth: '100%', height: defaultHeight, ...(style || {}) }}
         useResizeHandler={responsive ?? true}
       />
     </div>
@@ -86,7 +102,7 @@ export default function ArtifactRenderer({
       // html format
       if (artifact['html'] && typeof artifact['html'] === 'string') {
         return (
-          <div className="overflow-auto rounded border border-blue-200" style={{ touchAction: 'pan-x pan-y' }}>
+          <div className="max-w-full overflow-auto rounded border border-blue-200" style={{ touchAction: 'pan-x pan-y' }}>
             <div dangerouslySetInnerHTML={{ __html: artifact['html'] as string }} />
           </div>
         );
@@ -95,7 +111,7 @@ export default function ArtifactRenderer({
       const url = artifact['url'] as string | undefined;
       if (isHttpUrl(url)) {
         return (
-          <div className="overflow-hidden rounded border border-blue-200">
+          <div className="max-w-full overflow-hidden rounded border border-blue-200">
             <iframe src={url} className="h-[420px] w-full max-w-full" />
           </div>
         );
@@ -196,11 +212,11 @@ export default function ArtifactRenderer({
       const TableContent = ({ inFullscreen = false }: { inFullscreen?: boolean }) => {
         const visibleRows = rows.slice(startIdx, endIdx);
         return (
-          <div className={`w-full max-w-full ${responsive ? 'overflow-auto' : ''} rounded border border-gray-200`} style={{ touchAction: 'pan-x pan-y' }}>            
+          <div className={`w-full max-w-full ${responsive ? 'overflow-auto' : ''} rounded border border-gray-200`} style={{ touchAction: 'pan-x pan-y' }}>
             {/* Toolbar that shares scroll width with the table */}
-            <div className="min-w-full flex items-center justify-between gap-2 border-b bg-gray-50 px-2 py-1">
+            <div className="flex flex-col gap-2 border-b bg-gray-50 px-2 py-1 sm:flex-row sm:items-center sm:justify-between">
               {/* Left: actions */}
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center gap-1">
                 <button
                   type="button"
                   onClick={doCopy}
@@ -244,7 +260,7 @@ export default function ArtifactRenderer({
                 )}
               </div>
               {/* Right: showing, page size, pagination */}
-              <div className="flex items-center gap-2 text-[11px] text-gray-600">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-600">
                 <span className="hidden sm:inline">Showing {totalRows ? startIdx + 1 : 0}–{endIdx} of {totalRows} rows</span>
                 <label className="flex items-center gap-1">
                   <span className="hidden sm:inline">Rows per page</span>
@@ -282,7 +298,7 @@ export default function ArtifactRenderer({
                 </div>
               </div>
             </div>
-            <table className={`min-w-full text-left ${textSize} ${tableBorder}`}>
+            <table className={`min-w-full table-auto text-left ${textSize} ${tableBorder}`}>
               {title ? (
                 <caption className="caption-top border-b bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 text-left">
                   {title}
@@ -299,7 +315,7 @@ export default function ArtifactRenderer({
                 {visibleRows.map((r, i) => (
                   <tr key={i} className={trBase}>
                     {r.map((cell, j) => (
-                      <td key={j} className={`px-2 py-1 align-top break-words ${bordered ? 'border border-gray-200' : ''}`}>{String(cell)}</td>
+                      <td key={j} className={`max-w-[14rem] px-2 py-1 align-top whitespace-pre-wrap break-words ${bordered ? 'border border-gray-200' : ''}`}>{String(cell)}</td>
                     ))}
                   </tr>
                 ))}
@@ -351,7 +367,7 @@ export default function ArtifactRenderer({
       <summary className="cursor-pointer font-medium text-blue-700 select-none">
         {kind === StreamTypeEnum.INTERACTIVE ? '🖱 Interactive block' : '📊 UI block'}
       </summary>
-      <pre className="mt-1 max-h-60 overflow-auto text-blue-900">{JSON.stringify(artifact, null, 2)}</pre>
+      <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all text-blue-900">{JSON.stringify(artifact, null, 2)}</pre>
     </details>
   );
 }

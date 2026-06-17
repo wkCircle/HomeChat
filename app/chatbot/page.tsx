@@ -101,11 +101,11 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex min-w-0 h-screen flex-col">
       {/* Header */}
-      <header className="flex items-center justify-between border-b bg-white px-6 py-3 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <h1 className="text-lg font-semibold text-indigo-600">Pikachu HomeAI</h1>
-        <div className="flex items-center gap-2">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-white px-3 py-3 shadow-sm sm:px-6 dark:border-gray-700 dark:bg-gray-800">
+        <h1 className="min-w-0 text-lg font-semibold text-indigo-600">Pikachu HomeAI</h1>
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             onClick={reset}
             className="rounded px-3 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
@@ -131,11 +131,11 @@ export default function ChatPage() {
       {/* Message area */}
       <main
         ref={mainRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 py-4 sm:py-6"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 sm:py-6"
         // Improve touch scrolling on mobile; prevent accidental horizontal panning
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
       >
-        <div className="mx-auto w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl">
+        <div className="mx-auto w-full min-w-0 max-w-4xl lg:max-w-5xl xl:max-w-6xl">
           {messages.length === 0 ? (
             <p className="mt-24 text-center text-gray-400">Ask me anything to get started.</p>
           ) : (
@@ -164,8 +164,8 @@ export default function ChatPage() {
       </main>
 
       {/* Input */}
-      <footer className="border-t bg-white px-4 py-4 dark:border-gray-700 dark:bg-gray-800">
-        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-4xl items-end gap-2 lg:max-w-5xl xl:max-w-6xl">
+      <footer className="border-t bg-white px-3 py-4 sm:px-4 dark:border-gray-700 dark:bg-gray-800">
+        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-4xl flex-col items-stretch gap-2 sm:flex-row sm:items-end lg:max-w-5xl xl:max-w-6xl">
           <textarea
             ref={textareaRef}
             value={input}
@@ -174,13 +174,13 @@ export default function ChatPage() {
             placeholder={isMobileInputMode ? 'Message Pikachu HomeAI… (Tap Send to submit; Enter for newline)' : 'Message Pikachu HomeAI… (Enter to send, Shift+Enter for newline)'}
             enterKeyHint={isMobileInputMode ? 'enter' : 'send'}
             rows={1}
-            className="flex-1 h-auto max-h-40 resize-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
+            className="h-auto max-h-40 min-h-[44px] w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 sm:flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
             onInput={adjustTextareaHeight}
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40"
+            className="w-full rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40 sm:w-auto"
           >
             {isLoading ? '…' : 'Send'}
           </button>
