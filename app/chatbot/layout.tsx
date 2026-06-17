@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import ClientAuthGuard from './ClientAuthGuard';
 
 export const metadata: Metadata = {
   title: 'Pikachu HomeAI',
@@ -6,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function ChatbotLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <ClientAuthGuard>{children}</ClientAuthGuard>;
 }
