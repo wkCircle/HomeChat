@@ -62,11 +62,11 @@ function AvatarModal({ open, onClose, src, alt }: { open: boolean; onClose: () =
 
 function ReasoningBlock({ text }: { text: string }) {
   return (
-    <details className="my-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm">
-      <summary className="cursor-pointer font-medium text-purple-700 select-none">
+    <details className="my-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-[#2f2f2f]">
+      <summary className="cursor-pointer font-medium text-zinc-700 select-none dark:text-zinc-200">
         💭 Reasoning
       </summary>
-      <p className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-purple-900">{text}</p>
+      <p className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-zinc-800 dark:text-zinc-300">{text}</p>
     </details>
   );
 }
@@ -136,7 +136,7 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
       <button
         type="button"
         onClick={onAvatarClick}
-        className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-indigo-100 ring-1 ring-transparent outline-none transition focus-visible:ring-indigo-400"
+        className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-zinc-100 ring-1 ring-transparent outline-none transition focus-visible:ring-zinc-400 dark:bg-zinc-800"
         aria-label="View agent portrait"
       >
         <Image src="/avatars/pikachu_redsofa_2.jpeg" alt="Agent portrait" width={28} height={28} className="h-full w-full object-cover" priority />
@@ -182,10 +182,20 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
         })}
         {msg.parts.length === 0 && isLoading && (
           <span className="inline-flex items-center gap-1.5 text-sm text-gray-400">
-            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.3s]" />
-            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.15s]" />
-            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400" />
+            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.3s]" />
+            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.15s]" />
+            <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" />
             <span className="text-gray-400">Working…</span>
+          </span>
+        )}
+        {msg.status === 'interrupted' && !isLoading && (
+          <span className="inline-block rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            Stopped
+          </span>
+        )}
+        {msg.status === 'failed' && !isLoading && (
+          <span className="inline-block rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+            Failed
           </span>
         )}
       </div>
@@ -197,7 +207,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
   const text = msg.parts.find((p) => p.type === 'text')?.text ?? '';
   return (
     <div className="flex justify-end">
-      <div className="max-w-full sm:max-w-xl rounded-2xl bg-indigo-500 px-4 py-2 text-sm text-white break-words whitespace-pre-wrap">
+      <div className="max-w-full rounded-2xl bg-zinc-200 px-4 py-2 text-sm text-zinc-900 break-words whitespace-pre-wrap sm:max-w-xl dark:bg-[#2f2f2f] dark:text-zinc-100">
         {text}
       </div>
     </div>

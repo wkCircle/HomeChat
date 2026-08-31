@@ -68,4 +68,53 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   parts: MessagePart[];
+  status?: MessageStatus;
+}
+
+// ─── Conversation and history API contracts ─────────────────────────────────
+
+export type MessageStatus = 'completed' | 'streaming' | 'interrupted' | 'failed';
+export type RunStatus = 'running' | 'completed' | 'interrupted' | 'failed';
+
+export interface ModelsResponse {
+  models: string[];
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  model: string;
+  run_status: RunStatus | null;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+}
+
+export interface ConversationPage {
+  conversations: ConversationSummary[];
+  next_cursor: string | null;
+}
+
+export interface StoredMessagePart {
+  id: string;
+  position: number;
+  type: StreamType;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface StoredMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  ordinal: number;
+  status: MessageStatus;
+  parts: StoredMessagePart[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConversationHistory {
+  conversation: ConversationSummary;
+  messages: StoredMessage[];
+  truncated: boolean;
 }

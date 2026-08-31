@@ -49,7 +49,14 @@ async function proxy(
 
     const respHeaders = new Headers();
     // pass through content-type and cache headers commonly used
-    const pass = ['content-type', 'cache-control', 'pragma', 'www-authenticate', 'location'];
+    const pass = [
+      'content-type',
+      'cache-control',
+      'pragma',
+      'www-authenticate',
+      'location',
+      'x-run-id',
+    ];
     for (const k of pass) {
       const v = upstream.headers.get(k);
       if (v) respHeaders.set(k, v);
