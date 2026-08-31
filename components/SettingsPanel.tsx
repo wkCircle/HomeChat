@@ -55,14 +55,14 @@ export function SettingsPanel() {
         onClick={() => setOpen((o) => !o)}
         title="Settings"
         aria-label="Settings"
-        className="rounded p-1.5 text-zinc-500 hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-400 dark:hover:bg-zinc-700"
+        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-700"
       >
         <GearIcon />
       </button>
 
       {/* Floating panel */}
       {open && (
-        <div className="absolute right-0 top-10 z-50 w-60 rounded-lg border border-zinc-200 bg-white p-4 shadow-xl dark:border-zinc-700 dark:bg-[#2f2f2f]">
+        <div className="absolute right-0 top-10 z-50 w-60 rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800">
 
           {/* Theme */}
           <div className="mb-4">
@@ -105,7 +105,7 @@ export function SettingsPanel() {
                     aria-label={s}
                     className={`h-2 flex-1 rounded-full transition-colors ${
                       i === sizeIdx
-                        ? 'bg-zinc-700 dark:bg-zinc-200'
+                        ? 'bg-indigo-500'
                         : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500'
                     }`}
                   />

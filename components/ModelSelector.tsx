@@ -47,7 +47,7 @@ export function ModelSelector({ models, selectedModel, onSelect }: ModelSelector
         <div
           role="listbox"
           aria-label="Available models"
-          className="absolute bottom-12 right-0 z-40 min-w-48 overflow-hidden rounded-lg border border-zinc-200 bg-white p-1.5 shadow-xl dark:border-zinc-700 dark:bg-[#2f2f2f]"
+          className="absolute bottom-12 right-0 z-40 min-w-48 overflow-hidden rounded-lg border border-gray-200 bg-white p-1.5 shadow-xl dark:border-gray-600 dark:bg-gray-700"
         >
           {models.map((model) => {
             const selected = model === selectedModel;
@@ -61,10 +61,10 @@ export function ModelSelector({ models, selectedModel, onSelect }: ModelSelector
                   onSelect(model);
                   setOpen(false);
                 }}
-                className={`flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
+                className={`flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
                   selected
-                    ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-700 dark:text-white'
-                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-600 dark:text-indigo-300'
+                    : 'text-gray-600 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 <ModelIcon model={model} />
@@ -82,11 +82,11 @@ export function ModelSelector({ models, selectedModel, onSelect }: ModelSelector
         aria-label={`Select model, currently ${selectedModel}`}
         title="Select model"
         onClick={() => setOpen((current) => !current)}
-        className="flex h-10 max-w-36 items-center gap-2 rounded-lg px-3 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        className="flex h-10 max-w-36 items-center gap-2 rounded-lg px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-200 dark:hover:bg-gray-600"
       >
         <ModelIcon model={selectedModel} />
         <span className="truncate">{selectedModel}</span>
-        <i aria-hidden="true" className="fa-solid fa-chevron-up text-[10px] text-zinc-400" />
+        <i aria-hidden="true" className="fa-solid fa-chevron-up text-[10px] text-gray-400" />
       </button>
     </div>
   );

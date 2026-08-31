@@ -122,20 +122,20 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
       <aside
         ref={panelRef}
         aria-label="Conversation history"
-        className={`fixed inset-y-0 left-0 z-50 flex border-r border-zinc-200 bg-zinc-50 transition-[width,transform] duration-200 dark:border-zinc-800 dark:bg-[#171717] md:relative md:z-20 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex border-r border-gray-200 bg-white transition-[width,transform] duration-200 dark:border-gray-700 dark:bg-gray-800 md:relative md:z-20 md:translate-x-0 ${
           props.mobileOpen ? 'translate-x-0' : '-translate-x-full'
         } ${props.collapsed ? 'w-72 md:w-16' : 'w-72'}`}
       >
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className={`flex h-16 items-center border-b border-zinc-200 px-3 dark:border-zinc-700 ${props.collapsed ? 'md:justify-center' : 'justify-between'}`}>
-            <span className={`truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100 ${props.collapsed ? 'md:hidden' : ''}`}>
+          <div className={`flex h-16 items-center border-b border-gray-200 px-3 dark:border-gray-700 ${props.collapsed ? 'md:justify-center' : 'justify-between'}`}>
+            <span className={`truncate text-sm font-semibold text-indigo-600 dark:text-indigo-400 ${props.collapsed ? 'md:hidden' : ''}`}>
               Pikachu HomeAI
             </span>
             <button
               type="button"
               aria-label={props.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               title={props.collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="hidden h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 md:inline-flex dark:hover:bg-zinc-800"
+              className="hidden h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:inline-flex dark:text-gray-400 dark:hover:bg-gray-700"
               onClick={() => props.onCollapsedChange(!props.collapsed)}
             >
               <Icon name={props.collapsed ? 'expand' : 'collapse'} />
@@ -148,7 +148,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
               type="button"
               onClick={() => void props.onCreate()}
               title="New conversation"
-              className={`flex h-10 w-full items-center rounded-md border border-zinc-300 bg-white text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:border-zinc-700 dark:bg-transparent dark:text-zinc-100 dark:hover:bg-zinc-800 ${props.collapsed ? 'md:justify-center md:px-0' : 'gap-2 px-3'}`}
+              className={`flex h-10 w-full items-center rounded-md border border-indigo-200 bg-indigo-50 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300 dark:hover:bg-indigo-500/20 ${props.collapsed ? 'md:justify-center md:px-0' : 'gap-2 px-3'}`}
             >
               <Icon name="add" />
               <span className={props.collapsed ? 'md:hidden' : ''}>New conversation</span>
@@ -168,10 +168,10 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                       props.onMobileClose();
                     }}
                     title={conversation.title}
-                    className={`flex h-11 w-full min-w-0 items-center rounded-md text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 ${
+                    className={`flex h-11 w-full min-w-0 items-center rounded-md text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
                       selected
-                        ? 'bg-zinc-200 text-zinc-950 dark:bg-zinc-700 dark:text-white'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                        ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-700 dark:text-indigo-300'
+                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                     } ${props.collapsed ? 'md:justify-center md:px-0' : 'gap-2 pl-3 pr-10'}`}
                   >
                     {running ? (
@@ -186,14 +186,14 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                     aria-label={`Actions for ${conversation.title}`}
                     title="Conversation actions"
                     onClick={() => setMenuConversationId((current) => current === conversation.id ? null : conversation.id)}
-                    className={`absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 dark:hover:bg-zinc-600 ${props.collapsed ? 'hidden' : 'flex'}`}
+                    className={`absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-600 ${props.collapsed ? 'hidden' : 'flex'}`}
                   >
                     <Icon name="more" />
                   </button>
                   {menuConversationId === conversation.id && (
-                    <div className="absolute right-1 top-10 z-30 w-32 overflow-hidden rounded-md border border-zinc-200 bg-white py-1 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
-                      <button type="button" onClick={() => openRename(conversation)} className="block w-full px-3 py-2 text-left hover:bg-zinc-100 dark:hover:bg-zinc-700">Rename</button>
-                      <button type="button" onClick={() => openDelete(conversation)} className="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-zinc-700">Delete</button>
+                    <div className="absolute right-1 top-10 z-30 w-32 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-800">
+                      <button type="button" onClick={() => openRename(conversation)} className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700">Rename</button>
+                      <button type="button" onClick={() => openDelete(conversation)} className="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-gray-700">Delete</button>
                     </div>
                   )}
                 </div>
@@ -204,7 +204,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                 type="button"
                 disabled={props.isLoadingMore}
                 onClick={() => void props.onLoadMore()}
-                className="mt-2 w-full rounded-md px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-100 disabled:opacity-50 dark:hover:bg-zinc-800"
+                className="mt-2 w-full rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700"
               >
                 {props.isLoadingMore ? 'Loading...' : 'Load more'}
               </button>
@@ -224,13 +224,13 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
         >
           <form
             onSubmit={submitDialog}
-            className="w-full max-w-md rounded-xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-700 dark:bg-[#2f2f2f]"
+            className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-800"
           >
-            <h2 id="conversation-dialog-title" className="text-base font-semibold text-zinc-950 dark:text-white">
+            <h2 id="conversation-dialog-title" className="text-base font-semibold text-gray-900 dark:text-white">
               {dialog.kind === 'rename' ? 'Rename conversation' : 'Delete conversation'}
             </h2>
             {dialog.kind === 'rename' ? (
-              <label className="mt-4 block text-sm text-zinc-600 dark:text-zinc-300">
+              <label className="mt-4 block text-sm text-gray-600 dark:text-gray-300">
                 Title
                 <input
                   ref={renameInputRef}
@@ -238,12 +238,12 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                   maxLength={120}
                   disabled={isSubmitting}
                   onChange={(event) => setDialog({ ...dialog, title: event.target.value })}
-                  className="mt-2 h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-sm text-zinc-950 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-400 disabled:opacity-60 dark:border-zinc-600 dark:bg-[#212121] dark:text-zinc-100"
+                  className="mt-2 h-10 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 />
               </label>
             ) : (
-              <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                Permanently delete <strong className="font-semibold text-zinc-900 dark:text-white">{dialog.conversation.title}</strong>? This cannot be undone.
+              <p className="mt-3 text-sm leading-6 text-gray-600 dark:text-gray-300">
+                Permanently delete <strong className="font-semibold text-gray-900 dark:text-white">{dialog.conversation.title}</strong>? This cannot be undone.
               </p>
             )}
             {dialogError && (
@@ -254,7 +254,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                 type="button"
                 disabled={isSubmitting}
                 onClick={() => setDialog(null)}
-                className="h-10 rounded-lg px-4 text-sm font-medium text-zinc-600 hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:opacity-60 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="h-10 rounded-lg px-4 text-sm font-medium text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:opacity-60 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Cancel
               </button>
@@ -264,7 +264,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                 className={`h-10 rounded-lg px-4 text-sm font-semibold focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${
                   dialog.kind === 'delete'
                     ? 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-400'
-                    : 'bg-zinc-900 text-white hover:bg-zinc-700 focus-visible:ring-zinc-400 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white'
+                    : 'bg-indigo-500 text-white hover:bg-indigo-600 focus-visible:ring-indigo-300'
                 }`}
               >
                 {isSubmitting ? 'Saving...' : dialog.kind === 'rename' ? 'Rename' : 'Delete'}

@@ -120,7 +120,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen min-w-0 overflow-hidden bg-white dark:bg-[#212121]">
+    <div className="flex h-screen min-w-0 overflow-hidden bg-gray-100 dark:bg-gray-900">
       <ConversationSidebar
         conversations={chat.conversations}
         selectedConversationId={chat.selectedConversationId}
@@ -139,18 +139,18 @@ export default function ChatPage() {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-zinc-200 bg-white px-3 md:px-5 dark:border-zinc-700 dark:bg-[#212121]">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 md:px-5 dark:border-gray-700 dark:bg-gray-800">
           <div className="flex min-w-0 items-center gap-2">
             <button
               type="button"
               aria-label="Open conversation sidebar"
               title="Conversations"
               onClick={() => setMobileSidebarOpen(true)}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-zinc-600 hover:bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:hidden dark:text-gray-300 dark:hover:bg-gray-700"
             >
               <MenuIcon />
             </button>
-            <h1 className="truncate text-sm font-semibold text-zinc-950 dark:text-white">
+            <h1 className="truncate text-sm font-semibold text-indigo-600 dark:text-indigo-400">
               {chat.selectedConversation?.title ?? 'Pikachu HomeAI'}
             </h1>
           </div>
@@ -161,7 +161,7 @@ export default function ChatPage() {
                 await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
                 window.location.href = '/login';
               })}
-              className="rounded-md px-3 py-2 text-sm text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
+              className="rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
             >
               Logout
             </button>
@@ -172,10 +172,10 @@ export default function ChatPage() {
         <main ref={mainRef} className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 py-5 sm:px-5" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
           <div className="mx-auto w-full min-w-0 max-w-4xl lg:max-w-5xl">
             {chat.isInitializing ? (
-              <p className="mt-24 text-center text-sm text-zinc-400">Loading conversations...</p>
+              <p className="mt-24 text-center text-sm text-gray-400">Loading conversations...</p>
             ) : chat.messages.length === 0 ? (
               <div className="mx-auto mt-20 max-w-lg text-center">
-                <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">What can I help with?</h2>
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">What can I help with?</h2>
               </div>
             ) : (
               <MessageList messages={chat.messages} isLoading={chat.isLoading} />
@@ -194,17 +194,17 @@ export default function ChatPage() {
               aria-label="Scroll to latest message"
               title="Scroll to latest"
               onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
-              className="fixed bottom-24 right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-white shadow-lg hover:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 sm:right-6 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+              className="fixed bottom-24 right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg ring-1 ring-indigo-400/50 hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:right-6"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" /></svg>
             </button>
           )}
         </main>
 
-        <footer className="shrink-0 border-t border-zinc-200 bg-white px-3 py-3 sm:px-5 dark:border-zinc-700 dark:bg-[#212121]">
+        <footer className="shrink-0 border-t border-gray-200 bg-white px-3 py-3 sm:px-5 dark:border-gray-700 dark:bg-gray-800">
           <form
             onSubmit={handleSubmit}
-            className="mx-auto w-full max-w-4xl rounded-2xl border border-zinc-300 bg-white p-2 shadow-sm focus-within:border-zinc-400 lg:max-w-5xl dark:border-zinc-600 dark:bg-[#2f2f2f]"
+            className="mx-auto w-full max-w-4xl rounded-2xl border border-gray-300 bg-white p-2 shadow-sm focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400 lg:max-w-5xl dark:border-gray-600 dark:bg-gray-700"
           >
             <textarea
               ref={textareaRef}
@@ -215,7 +215,7 @@ export default function ChatPage() {
               placeholder="Message Pikachu HomeAI"
               enterKeyHint={isMobileInputMode ? 'enter' : 'send'}
               rows={1}
-              className="block max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-sm text-zinc-950 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-500"
+              className="block max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-sm text-gray-900 focus:outline-none dark:text-gray-100 dark:placeholder:text-gray-400"
             />
             <div className="flex items-center justify-end gap-1">
               <ModelSelector
@@ -226,7 +226,7 @@ export default function ChatPage() {
               <button
                 type="submit"
                 disabled={chat.isLoading || !input.trim()}
-                className="h-10 shrink-0 rounded-lg bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                className="h-10 shrink-0 rounded-lg bg-indigo-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {chat.isLoading ? 'Working...' : 'Send'}
               </button>
