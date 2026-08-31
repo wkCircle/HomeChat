@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { MessageList } from '@/components/MessageList';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { DEFAULT_MODEL } from '@/lib/types';
 import { useChat } from '@/lib/useChat';
 
 export default function ChatPage() {
   const { messages, isLoading, error, append, reset } = useChat({
-    model: 'gpt-5.1',
+    model: DEFAULT_MODEL,
     returnReasoning: true,
     returnFuncCallInfo: true,
   });

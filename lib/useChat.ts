@@ -10,8 +10,8 @@ function randomId(): string {
 }
 
 export interface UseChatOptions {
-  /** LLM model name. Defaults to gpt-5.1. */
-  model?: string;
+  /** LLM model selected by the user. */
+  model: string;
   /** Whether to request reasoning blocks from the backend. */
   returnReasoning?: boolean;
   /** Whether to request function call start/end blocks. */
@@ -19,10 +19,10 @@ export interface UseChatOptions {
 }
 
 export function useChat({
-  model = 'gpt-5.1',
+  model,
   returnReasoning = true,
   returnFuncCallInfo = true,
-}: UseChatOptions = {}) {
+}: UseChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
