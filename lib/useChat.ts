@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import apiFetch from './api';
+import { mergeConversations } from './conversations';
 import { NdjsonParser } from './ndjson';
 import { DEFAULT_MODEL, StreamTypeEnum } from './types';
 import type {
@@ -84,9 +85,7 @@ export function useChat({
         ...current,
         [conversationId]: history.messages.map(storedMessageToChatMessage),
       }));
-      setConversations((current) =>
-        current.map((item) => (item.id === conversationId ? history.conversation : item)),
-      );
+      setConversations((current) => mergeConversations(current, [history.conversation]));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setErrorsByConversation((current) => ({ ...current, [conversationId]: message }));
@@ -111,7 +110,7 @@ export function useChat({
 
       if (conversationsResult.status === 'fulfilled' && conversationsResult.value.ok) {
         const page = (await conversationsResult.value.json()) as ConversationPage;
-        setConversations(page.conversations);
+        setConversations(mergeConversations([], page.conversations));
         setNextCursor(page.next_cursor);
         const firstId = page.conversations[0]?.id ?? null;
         setSelectedConversationId(firstId);
@@ -126,6 +125,18 @@ export function useChat({
   }, [loadHistory]);
 
   const createConversation = useCallback(async (model = DEFAULT_MODEL) => {
+    const unused = conversations.find(
+      (conversation) =>
+        conversation.title === 'New chat'
+        && messagesByConversation[conversation.id]?.length === 0
+        && !streamingByConversation[conversation.id],
+    );
+    if (unused) {
+      setErrorsByConversation((current) => ({ ...current, [unused.id]: null }));
+      setSelectedConversationId(unused.id);
+      return unused;
+    }
+
     const response = await apiFetch('/api/chat/conversations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -135,12 +146,15 @@ export function useChat({
       throw await responseError(response, `Unable to create conversation (${response.status})`);
     }
     const conversation = (await response.json()) as ConversationSummary;
-    setConversations((current) => [conversation, ...current]);
-    setMessagesByConversation((current) => ({ ...current, [conversation.id]: [] }));
+    setConversations((current) => mergeConversations(current, [conversation]));
+    setMessagesByConversation((current) => ({
+      ...current,
+      [conversation.id]: current[conversation.id] ?? [],
+    }));
     setErrorsByConversation((current) => ({ ...current, [conversation.id]: null }));
     setSelectedConversationId(conversation.id);
     return conversation;
-  }, []);
+  }, [conversations, messagesByConversation, streamingByConversation]);
 
   const selectConversation = useCallback(
     (conversationId: string) => {
@@ -161,9 +175,7 @@ export function useChat({
       throw await responseError(response, `Unable to rename conversation (${response.status})`);
     }
     const updated = (await response.json()) as ConversationSummary;
-    setConversations((current) =>
-      current.map((conversation) => (conversation.id === updated.id ? updated : conversation)),
-    );
+    setConversations((current) => mergeConversations(current, [updated]));
   }, []);
 
   const deleteConversation = useCallback(
@@ -205,7 +217,7 @@ export function useChat({
         throw await responseError(response, `Unable to load conversations (${response.status})`);
       }
       const page = (await response.json()) as ConversationPage;
-      setConversations((current) => [...current, ...page.conversations]);
+      setConversations((current) => mergeConversations(current, page.conversations));
       setNextCursor(page.next_cursor);
     } finally {
       setIsLoadingMore(false);
@@ -221,6 +233,11 @@ export function useChat({
       if (!conversation) conversation = await createConversation(selectedModel);
       const conversationId = conversation.id;
       if (streamControllers.current.has(conversationId)) return;
+
+      const promptTimestamp = new Date().toISOString();
+      setConversations((current) =>
+        mergeConversations(current, [{ ...conversation, last_message_at: promptTimestamp }]),
+      );
 
       const existingMessages = messagesByConversation[conversationId] ?? [];
       if (existingMessages.length === 0 && conversation.title === 'New chat') {

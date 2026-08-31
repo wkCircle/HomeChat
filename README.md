@@ -49,6 +49,32 @@ Open http://localhost:3000. By default, the proxy will try `http://localhost:801
 
 ---
 
+## Testing
+
+Run all TypeScript and TSX unit tests once:
+
+```bash
+npm test
+```
+
+Run a specific test file:
+
+```bash
+npm test -- lib/conversations.test.ts
+npm test -- components/ConversationSidebar.test.tsx
+```
+
+Run tests in watch mode while developing:
+
+```bash
+npm test -- --watch
+```
+
+Tests are run with Vitest. Unit tests are colocated with their source files using the
+`.test.ts` or `.test.tsx` suffix; shared test setup lives under `tests/`.
+
+---
+
 ## Production Build
 
 ```bash

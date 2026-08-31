@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { formatConversationAge } from '@/lib/conversations';
 import type { ConversationSummary } from '@/lib/types';
 
 interface ConversationSidebarProps {
@@ -44,6 +45,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
   >(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const panelRef = useRef<HTMLElement>(null);
   const newChatRef = useRef<HTMLButtonElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -59,11 +61,18 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
   }, [props.mobileOpen, props.onMobileClose]);
 
   useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (dialog?.kind !== 'rename') return;
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [dialog?.kind, dialog?.conversation.id]);
+
+  useEffect(() => {
     if (!dialog) return;
-    if (dialog.kind === 'rename') {
-      renameInputRef.current?.focus();
-      renameInputRef.current?.select();
-    }
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !isSubmitting) setDialog(null);
     };
@@ -179,14 +188,21 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                     ) : (
                       <Icon name="chat" />
                     )}
-                    <span className={`truncate ${props.collapsed ? 'md:hidden' : ''}`}>{conversation.title}</span>
+                    <span className={`min-w-0 flex-1 truncate ${props.collapsed ? 'md:hidden' : ''}`}>{conversation.title}</span>
+                    <time
+                      dateTime={conversation.last_message_at}
+                      title={new Date(conversation.last_message_at).toLocaleString()}
+                      className={`shrink-0 text-xs text-gray-400 dark:text-gray-500 ${props.collapsed ? 'md:hidden' : ''}`}
+                    >
+                      {formatConversationAge(conversation.last_message_at, now)}
+                    </time>
                   </button>
                   <button
                     type="button"
                     aria-label={`Actions for ${conversation.title}`}
                     title="Conversation actions"
                     onClick={() => setMenuConversationId((current) => current === conversation.id ? null : conversation.id)}
-                    className={`absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-600 ${props.collapsed ? 'hidden' : 'flex'}`}
+                    className={`absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-600 ${props.collapsed ? 'flex md:hidden' : 'flex'}`}
                   >
                     <Icon name="more" />
                   </button>
