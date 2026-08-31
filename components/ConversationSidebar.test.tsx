@@ -7,7 +7,6 @@ import { ConversationSidebar } from './ConversationSidebar';
 const conversation: ConversationSummary = {
   id: 'conversation-1',
   title: 'New chat',
-  model: 'gpt-5.1',
   run_status: null,
   created_at: '2026-08-31T00:00:00Z',
   updated_at: '2026-08-31T00:00:00Z',

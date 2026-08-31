@@ -8,7 +8,6 @@ function conversation(id: string, lastMessageAt: string): ConversationSummary {
   return {
     id,
     title: id,
-    model: 'gpt-5.1',
     run_status: null,
     created_at: lastMessageAt,
     updated_at: lastMessageAt,

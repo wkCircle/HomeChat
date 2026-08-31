@@ -83,7 +83,6 @@ export interface ModelsResponse {
 export interface ConversationSummary {
   id: string;
   title: string;
-  model: string;
   run_status: RunStatus | null;
   created_at: string;
   updated_at: string;
