@@ -129,7 +129,7 @@ export default function ChatPage() {
         mobileOpen={mobileSidebarOpen}
         hasMore={chat.hasMoreConversations}
         isLoadingMore={chat.isLoadingMore}
-        onCreate={() => runAction(async () => { await chat.createConversation(selectedModel); })}
+        onCreate={() => runAction(async () => { await chat.createConversation(); })}
         onSelect={chat.selectConversation}
         onRename={chat.renameConversation}
         onDelete={chat.deleteConversation}

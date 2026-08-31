@@ -124,7 +124,7 @@ export function useChat({
     };
   }, [loadHistory]);
 
-  const createConversation = useCallback(async (model = DEFAULT_MODEL) => {
+  const createConversation = useCallback(async () => {
     const unused = conversations.find(
       (conversation) =>
         conversation.title === 'New chat'
@@ -139,8 +139,6 @@ export function useChat({
 
     const response = await apiFetch('/api/chat/conversations', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model }),
     });
     if (!response.ok) {
       throw await responseError(response, `Unable to create conversation (${response.status})`);
@@ -230,7 +228,7 @@ export function useChat({
       if (!trimmedMessage) return;
 
       let conversation = conversations.find((item) => item.id === selectedConversationId);
-      if (!conversation) conversation = await createConversation(selectedModel);
+      if (!conversation) conversation = await createConversation();
       const conversationId = conversation.id;
       if (streamControllers.current.has(conversationId)) return;
 
