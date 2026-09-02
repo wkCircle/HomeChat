@@ -16,6 +16,7 @@ interface ConversationSidebarProps {
   onSelect: (conversationId: string) => void;
   onRename: (conversationId: string, title: string) => Promise<void>;
   onDelete: (conversationId: string) => Promise<void>;
+  onStop: (conversationId: string) => Promise<void>;
   onLoadMore: () => Promise<void>;
   onCollapsedChange: (collapsed: boolean) => void;
   onMobileClose: () => void;
@@ -209,6 +210,18 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
                   {menuConversationId === conversation.id && (
                     <div className="absolute right-1 top-10 z-30 w-32 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-800">
                       <button type="button" onClick={() => openRename(conversation)} className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700">Rename</button>
+                      {running && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMenuConversationId(null);
+                            void props.onStop(conversation.id);
+                          }}
+                          className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+                        >
+                          Stop
+                        </button>
+                      )}
                       <button type="button" onClick={() => openDelete(conversation)} className="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-gray-700">Delete</button>
                     </div>
                   )}

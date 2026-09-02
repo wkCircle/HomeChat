@@ -76,6 +76,12 @@ export interface ChatMessage {
 export type MessageStatus = 'completed' | 'streaming' | 'interrupted' | 'failed';
 export type RunStatus = 'running' | 'completed' | 'interrupted' | 'failed';
 
+export interface RunStatusResponse {
+  run_id: string;
+  status: RunStatus;
+  cancel_requested: boolean;
+}
+
 export interface ModelsResponse {
   models: string[];
 }

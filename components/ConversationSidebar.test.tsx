@@ -28,6 +28,7 @@ describe('ConversationSidebar', () => {
         onSelect={vi.fn()}
         onRename={vi.fn()}
         onDelete={vi.fn()}
+        onStop={vi.fn()}
         onLoadMore={vi.fn()}
         onCollapsedChange={vi.fn()}
         onMobileClose={vi.fn()}
@@ -53,6 +54,7 @@ describe('ConversationSidebar', () => {
         onSelect={vi.fn()}
         onRename={vi.fn()}
         onDelete={vi.fn()}
+        onStop={vi.fn()}
         onLoadMore={vi.fn()}
         onCollapsedChange={vi.fn()}
         onMobileClose={vi.fn()}
@@ -67,5 +69,36 @@ describe('ConversationSidebar', () => {
     await user.keyboard('hello');
 
     expect(titleInput).toHaveValue('hello');
+  });
+
+  it('stops the selected active conversation from its action menu', async () => {
+    const user = userEvent.setup();
+    const onStop = vi.fn().mockResolvedValue(undefined);
+    const running = { ...conversation, run_status: 'running' as const };
+    const view = render(
+      <ConversationSidebar
+        conversations={[running]}
+        selectedConversationId={running.id}
+        streamingByConversation={{ [running.id]: true }}
+        collapsed={false}
+        mobileOpen
+        hasMore={false}
+        isLoadingMore={false}
+        onCreate={vi.fn()}
+        onSelect={vi.fn()}
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
+        onStop={onStop}
+        onLoadMore={vi.fn()}
+        onCollapsedChange={vi.fn()}
+        onMobileClose={vi.fn()}
+      />,
+    );
+
+    const sidebar = within(view.container);
+    await user.click(sidebar.getByRole('button', { name: 'Actions for New chat' }));
+    await user.click(sidebar.getByRole('button', { name: 'Stop' }));
+
+    expect(onStop).toHaveBeenCalledWith(running.id);
   });
 });

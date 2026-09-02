@@ -12,6 +12,7 @@ import type {
   ConversationSummary,
   MessagePart,
   ModelsResponse,
+  RunStatusResponse,
   StoredMessage,
   StreamEvent,
 } from './types';
@@ -71,6 +72,8 @@ export function useChat({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const historyRequests = useRef(new Set<string>());
   const streamControllers = useRef(new Map<string, AbortController>());
+  const runIdsByConversation = useRef(new Map<string, string>());
+  const stoppedRunIds = useRef(new Set<string>());
 
   const loadHistory = useCallback(async (conversationId: string) => {
     if (historyRequests.current.has(conversationId)) return;
@@ -296,6 +299,9 @@ export function useChat({
         if (!response.ok) {
           throw await responseError(response, `Chat request failed (${response.status})`);
         }
+        const runId = response.headers.get('x-run-id');
+        if (!runId) throw new Error('The chat response did not include a run identifier.');
+        runIdsByConversation.current.set(conversationId, runId);
         if (!response.body) throw new Error('The chat response did not include a stream body.');
 
         const reader = response.body.getReader();
@@ -311,10 +317,11 @@ export function useChat({
         for (const event of parser.finish()) {
           updateParts((parts) => routeEvent(parts, event));
         }
+        const finalStatus = stoppedRunIds.current.has(runId) ? 'interrupted' : 'completed';
         setMessagesByConversation((current) => ({
           ...current,
           [conversationId]: (current[conversationId] ?? []).map((message) =>
-            message.id === assistantId ? { ...message, status: 'completed' } : message,
+            message.id === assistantId ? { ...message, status: finalStatus } : message,
           ),
         }));
       } catch (error) {
@@ -331,6 +338,9 @@ export function useChat({
       } finally {
         if (streamControllers.current.get(conversationId) === controller) {
           streamControllers.current.delete(conversationId);
+          const runId = runIdsByConversation.current.get(conversationId);
+          if (runId) stoppedRunIds.current.delete(runId);
+          runIdsByConversation.current.delete(conversationId);
           setStreamingByConversation((current) => ({ ...current, [conversationId]: false }));
         }
       }
@@ -345,6 +355,42 @@ export function useChat({
       selectedConversationId,
     ],
   );
+
+  const stopConversation = useCallback(async (conversationId: string) => {
+    const runId = runIdsByConversation.current.get(conversationId);
+    if (!runId) throw new Error('The active run is not available in this browser session.');
+    stoppedRunIds.current.add(runId);
+    let result: RunStatusResponse;
+    try {
+      const response = await apiFetch(`/api/chat/runs/${runId}/stop?wait=true`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw await responseError(response, `Unable to stop run (${response.status})`);
+      }
+      result = (await response.json()) as RunStatusResponse;
+    } catch (error) {
+      stoppedRunIds.current.delete(runId);
+      throw error;
+    }
+    if (result.status === 'interrupted') {
+      setMessagesByConversation((current) => ({
+        ...current,
+        [conversationId]: (current[conversationId] ?? []).map((message) =>
+          message.role === 'assistant' && message.status === 'streaming'
+            ? { ...message, status: 'interrupted' }
+            : message,
+        ),
+      }));
+    }
+    streamControllers.current.get(conversationId)?.abort();
+    setStreamingByConversation((current) => ({ ...current, [conversationId]: false }));
+    setConversations((current) => current.map((conversation) =>
+      conversation.id === conversationId
+        ? { ...conversation, run_status: result.status }
+        : conversation,
+    ));
+  }, []);
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
@@ -373,6 +419,7 @@ export function useChat({
     selectConversation,
     renameConversation,
     deleteConversation,
+    stopConversation,
     loadMoreConversations,
   };
 }

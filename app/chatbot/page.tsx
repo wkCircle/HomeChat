@@ -133,6 +133,7 @@ export default function ChatPage() {
         onSelect={chat.selectConversation}
         onRename={chat.renameConversation}
         onDelete={chat.deleteConversation}
+        onStop={(conversationId) => runAction(() => chat.stopConversation(conversationId))}
         onLoadMore={() => runAction(chat.loadMoreConversations)}
         onCollapsedChange={changeCollapsed}
         onMobileClose={() => setMobileSidebarOpen(false)}
@@ -223,13 +224,23 @@ export default function ChatPage() {
                 selectedModel={selectedModel}
                 onSelect={setSelectedModel}
               />
-              <button
-                type="submit"
-                disabled={chat.isLoading || !input.trim()}
-                className="h-10 shrink-0 rounded-lg bg-indigo-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {chat.isLoading ? 'Working...' : 'Send'}
-              </button>
+              {chat.isLoading && chat.selectedConversationId ? (
+                <button
+                  type="button"
+                  onClick={() => void runAction(() => chat.stopConversation(chat.selectedConversationId!))}
+                  className="h-10 shrink-0 rounded-lg border border-red-300 px-5 text-sm font-semibold text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim()}
+                  className="h-10 shrink-0 rounded-lg bg-indigo-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Send
+                </button>
+              )}
             </div>
           </form>
         </footer>
