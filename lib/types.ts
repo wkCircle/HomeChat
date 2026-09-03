@@ -90,6 +90,7 @@ export interface ConversationSummary {
   id: string;
   title: string;
   run_status: RunStatus | null;
+  active_run_id: string | null;
   created_at: string;
   updated_at: string;
   last_message_at: string;

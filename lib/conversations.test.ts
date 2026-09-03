@@ -9,6 +9,7 @@ function conversation(id: string, lastMessageAt: string): ConversationSummary {
     id,
     title: id,
     run_status: null,
+    active_run_id: null,
     created_at: lastMessageAt,
     updated_at: lastMessageAt,
     last_message_at: lastMessageAt,

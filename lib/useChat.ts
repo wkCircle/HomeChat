@@ -46,6 +46,11 @@ function initialTitle(message: string): string {
   return normalized.length > 50 ? `${normalized.slice(0, 47).trimEnd()}...` : normalized;
 }
 
+interface PendingRunId {
+  promise: Promise<string | null>;
+  resolve: (runId: string | null) => void;
+}
+
 export interface UseChatOptions {
   returnReasoning?: boolean;
   returnFuncCallInfo?: boolean;
@@ -73,7 +78,29 @@ export function useChat({
   const historyRequests = useRef(new Set<string>());
   const streamControllers = useRef(new Map<string, AbortController>());
   const runIdsByConversation = useRef(new Map<string, string>());
+  const pendingRunIdsByConversation = useRef(new Map<string, PendingRunId>());
   const stoppedRunIds = useRef(new Set<string>());
+
+  const synchronizeActiveRunIds = (items: ConversationSummary[]) => {
+    for (const conversation of items) {
+      if (conversation.active_run_id && stoppedRunIds.current.has(conversation.active_run_id)) {
+        continue;
+      }
+      if (conversation.run_status === 'running' && conversation.active_run_id) {
+        runIdsByConversation.current.set(conversation.id, conversation.active_run_id);
+      } else {
+        runIdsByConversation.current.delete(conversation.id);
+      }
+    }
+  };
+
+  const summariesWithCurrentRunStatus = (items: ConversationSummary[]) => items.map(
+    (conversation) => (
+      conversation.active_run_id && stoppedRunIds.current.has(conversation.active_run_id)
+        ? { ...conversation, run_status: 'interrupted' as const, active_run_id: null }
+        : conversation
+    ),
+  );
 
   const loadHistory = useCallback(async (conversationId: string) => {
     if (historyRequests.current.has(conversationId)) return;
@@ -84,11 +111,17 @@ export function useChat({
         throw await responseError(response, `Unable to load conversation (${response.status})`);
       }
       const history = (await response.json()) as ConversationHistory;
+      const conversation = summariesWithCurrentRunStatus([history.conversation])[0];
+      synchronizeActiveRunIds([conversation]);
+      setStreamingByConversation((current) => ({
+        ...current,
+        [conversationId]: conversation.run_status === 'running',
+      }));
       setMessagesByConversation((current) => ({
         ...current,
         [conversationId]: history.messages.map(storedMessageToChatMessage),
       }));
-      setConversations((current) => mergeConversations(current, [history.conversation]));
+      setConversations((current) => mergeConversations(current, [conversation]));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setErrorsByConversation((current) => ({ ...current, [conversationId]: message }));
@@ -113,9 +146,11 @@ export function useChat({
 
       if (conversationsResult.status === 'fulfilled' && conversationsResult.value.ok) {
         const page = (await conversationsResult.value.json()) as ConversationPage;
-        setConversations(mergeConversations([], page.conversations));
+        const conversations = summariesWithCurrentRunStatus(page.conversations);
+        synchronizeActiveRunIds(conversations);
+        setConversations(mergeConversations([], conversations));
         setNextCursor(page.next_cursor);
-        const firstId = page.conversations[0]?.id ?? null;
+        const firstId = conversations[0]?.id ?? null;
         setSelectedConversationId(firstId);
         if (firstId) void loadHistory(firstId);
       }
@@ -126,6 +161,18 @@ export function useChat({
       active = false;
     };
   }, [loadHistory]);
+
+  useEffect(() => {
+    const runningConversationIds = conversations
+      .filter((conversation) => conversation.run_status === 'running')
+      .map((conversation) => conversation.id);
+    if (runningConversationIds.length === 0) return;
+    const revalidate = () => {
+      for (const conversationId of runningConversationIds) void loadHistory(conversationId);
+    };
+    const timer = window.setInterval(revalidate, 2_000);
+    return () => window.clearInterval(timer);
+  }, [conversations, loadHistory]);
 
   const createConversation = useCallback(async () => {
     const unused = conversations.find(
@@ -188,6 +235,7 @@ export function useChat({
         throw await responseError(response, `Unable to delete conversation (${response.status})`);
       }
       streamControllers.current.get(conversationId)?.abort();
+      runIdsByConversation.current.delete(conversationId);
       setConversations((current) => {
         const remaining = current.filter((conversation) => conversation.id !== conversationId);
         setSelectedConversationId((selected) => {
@@ -218,7 +266,9 @@ export function useChat({
         throw await responseError(response, `Unable to load conversations (${response.status})`);
       }
       const page = (await response.json()) as ConversationPage;
-      setConversations((current) => mergeConversations(current, page.conversations));
+      const conversations = summariesWithCurrentRunStatus(page.conversations);
+      synchronizeActiveRunIds(conversations);
+      setConversations((current) => mergeConversations(current, conversations));
       setNextCursor(page.next_cursor);
     } finally {
       setIsLoadingMore(false);
@@ -268,6 +318,12 @@ export function useChat({
 
       const controller = new AbortController();
       streamControllers.current.set(conversationId, controller);
+      let resolvePendingRunId: PendingRunId['resolve'];
+      const pendingRunId = new Promise<string | null>((resolve) => {
+        resolvePendingRunId = resolve;
+      });
+      const pendingRun = { promise: pendingRunId, resolve: resolvePendingRunId! };
+      pendingRunIdsByConversation.current.set(conversationId, pendingRun);
       const updateParts = (updater: (parts: MessagePart[]) => MessagePart[]) => {
         setMessagesByConversation((current) => ({
           ...current,
@@ -302,6 +358,7 @@ export function useChat({
         const runId = response.headers.get('x-run-id');
         if (!runId) throw new Error('The chat response did not include a run identifier.');
         runIdsByConversation.current.set(conversationId, runId);
+        pendingRun.resolve(runId);
         if (!response.body) throw new Error('The chat response did not include a stream body.');
 
         const reader = response.body.getReader();
@@ -336,6 +393,10 @@ export function useChat({
           ),
         }));
       } finally {
+        if (pendingRunIdsByConversation.current.get(conversationId) === pendingRun) {
+          pendingRunIdsByConversation.current.delete(conversationId);
+          pendingRun.resolve(null);
+        }
         if (streamControllers.current.get(conversationId) === controller) {
           streamControllers.current.delete(conversationId);
           const runId = runIdsByConversation.current.get(conversationId);
@@ -357,8 +418,9 @@ export function useChat({
   );
 
   const stopConversation = useCallback(async (conversationId: string) => {
-    const runId = runIdsByConversation.current.get(conversationId);
-    if (!runId) throw new Error('The active run is not available in this browser session.');
+    const runId = runIdsByConversation.current.get(conversationId)
+      ?? await pendingRunIdsByConversation.current.get(conversationId)?.promise;
+    if (!runId) throw new Error('The active run is no longer available.');
     stoppedRunIds.current.add(runId);
     let result: RunStatusResponse;
     try {
@@ -384,10 +446,11 @@ export function useChat({
       }));
     }
     streamControllers.current.get(conversationId)?.abort();
+    runIdsByConversation.current.delete(conversationId);
     setStreamingByConversation((current) => ({ ...current, [conversationId]: false }));
     setConversations((current) => current.map((conversation) =>
       conversation.id === conversationId
-        ? { ...conversation, run_status: result.status }
+        ? { ...conversation, run_status: result.status, active_run_id: null }
         : conversation,
     ));
   }, []);
