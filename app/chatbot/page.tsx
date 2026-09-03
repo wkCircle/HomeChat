@@ -235,10 +235,12 @@ export default function ChatPage() {
               ) : (
                 <button
                   type="submit"
+                  aria-label="Send message"
+                  title="Send message"
                   disabled={!input.trim()}
-                  className="h-10 shrink-0 rounded-lg bg-indigo-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-sm text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Send
+                  <i aria-hidden="true" className="fa-solid fa-paper-plane" />
                 </button>
               )}
             </div>
