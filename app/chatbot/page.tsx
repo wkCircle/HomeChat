@@ -48,6 +48,13 @@ export default function ChatPage() {
   }, [chat.messages]);
 
   useEffect(() => {
+    if (!chat.selectedConversationId) return;
+    const element = mainRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+    setShowScrollToBottom(false);
+  }, [chat.selectedConversationId]);
+
+  useEffect(() => {
     const element = mainRef.current;
     if (!element) return;
     const onScroll = () => {
