@@ -1,88 +1,351 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import apiFetch from './api';
-import { StreamTypeEnum } from './types';
-import type { ChatMessage, MessagePart, StreamEvent } from './types';
+import { mergeConversations } from './conversations';
+import { NdjsonParser } from './ndjson';
+import { DEFAULT_MODEL, StreamTypeEnum } from './types';
+import type {
+  ChatMessage,
+  ConversationHistory,
+  ConversationPage,
+  ConversationSummary,
+  MessagePart,
+  ModelsResponse,
+  RunStatusResponse,
+  StoredMessage,
+  StreamEvent,
+} from './types';
 
 function randomId(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
+async function responseError(response: Response, fallback: string): Promise<Error> {
+  try {
+    const body = (await response.json()) as { detail?: string; error?: string };
+    return new Error(body.detail ?? body.error ?? fallback);
+  } catch {
+    return new Error(fallback);
+  }
+}
+
+function storedMessageToChatMessage(message: StoredMessage): ChatMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    status: message.status,
+    parts: message.parts.reduce<MessagePart[]>((parts, part) => {
+      return routeEvent(parts, { type: part.type, content: part.payload, metadata: {} });
+    }, []),
+  };
+}
+
+interface PendingRunId {
+  promise: Promise<string | null>;
+  resolve: (runId: string | null) => void;
+}
+
 export interface UseChatOptions {
-  /** LLM model name. Defaults to gpt-5.1. */
-  model?: string;
-  /** Whether to request reasoning blocks from the backend. */
   returnReasoning?: boolean;
-  /** Whether to request function call start/end blocks. */
   returnFuncCallInfo?: boolean;
 }
 
 export function useChat({
-  model = 'gpt-5.1',
   returnReasoning = true,
   returnFuncCallInfo = true,
 }: UseChatOptions = {}) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // thread_id is stable for the lifetime of this hook instance (one conversation)
-  const threadId = useRef<string>(randomId());
-  const STORAGE_KEY = 'homechat:chat:messages';
-  const STORAGE_THREAD_KEY = 'homechat:chat:threadId';
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [messagesByConversation, setMessagesByConversation] = useState<
+    Record<string, ChatMessage[]>
+  >({});
+  const [streamingByConversation, setStreamingByConversation] = useState<
+    Record<string, boolean>
+  >({});
+  const [errorsByConversation, setErrorsByConversation] = useState<
+    Record<string, string | null>
+  >({});
+  const [models, setModels] = useState<string[]>([DEFAULT_MODEL]);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const historyRequests = useRef(new Set<string>());
+  const streamControllers = useRef(new Map<string, AbortController>());
+  const runIdsByConversation = useRef(new Map<string, string>());
+  const pendingRunIdsByConversation = useRef(new Map<string, PendingRunId>());
+  const stoppedRunIds = useRef(new Set<string>());
 
-  // Hydrate from localStorage on first mount
-  useEffect(() => {
-    try {
-      const rawMsgs = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-      const rawThread = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_THREAD_KEY) : null;
-      if (rawThread) threadId.current = rawThread;
-      if (rawMsgs) {
-        const parsed = JSON.parse(rawMsgs) as ChatMessage[];
-        if (Array.isArray(parsed)) {
-          setMessages(parsed);
-        }
+  const synchronizeActiveRunIds = (items: ConversationSummary[]) => {
+    for (const conversation of items) {
+      if (conversation.active_run_id && stoppedRunIds.current.has(conversation.active_run_id)) {
+        continue;
       }
-    } catch {
-      // ignore corrupt storage
+      if (conversation.run_status === 'running' && conversation.active_run_id) {
+        runIdsByConversation.current.set(conversation.id, conversation.active_run_id);
+      } else {
+        runIdsByConversation.current.delete(conversation.id);
+      }
+    }
+  };
+
+  const summariesWithCurrentRunStatus = (items: ConversationSummary[]) => items.map(
+    (conversation) => (
+      conversation.active_run_id && stoppedRunIds.current.has(conversation.active_run_id)
+        ? { ...conversation, run_status: 'interrupted' as const, active_run_id: null }
+        : conversation
+    ),
+  );
+
+  const loadHistory = useCallback(async (conversationId: string) => {
+    if (historyRequests.current.has(conversationId)) return;
+    historyRequests.current.add(conversationId);
+    try {
+      const response = await apiFetch(`/api/chat/conversations/${conversationId}/messages`);
+      if (!response.ok) {
+        throw await responseError(response, `Unable to load conversation (${response.status})`);
+      }
+      const history = (await response.json()) as ConversationHistory;
+      const conversation = summariesWithCurrentRunStatus([history.conversation])[0];
+      synchronizeActiveRunIds([conversation]);
+      setStreamingByConversation((current) => ({
+        ...current,
+        [conversationId]: conversation.run_status === 'running',
+      }));
+      setMessagesByConversation((current) => ({
+        ...current,
+        [conversationId]: history.messages.map(storedMessageToChatMessage),
+      }));
+      setConversations((current) => mergeConversations(current, [conversation]));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorsByConversation((current) => ({ ...current, [conversationId]: message }));
+    } finally {
+      historyRequests.current.delete(conversationId);
     }
   }, []);
 
-  // Persist to localStorage on changes
   useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
-      localStorage.setItem(STORAGE_THREAD_KEY, threadId.current);
-    } catch {
-      // storage quota exceeded or forbidden — ignore silently for quick fix
+    let active = true;
+    async function initialize() {
+      const [modelsResult, conversationsResult] = await Promise.allSettled([
+        apiFetch('/api/chat/models'),
+        apiFetch('/api/chat/conversations?limit=20'),
+      ]);
+      if (!active) return;
+
+      if (modelsResult.status === 'fulfilled' && modelsResult.value.ok) {
+        const data = (await modelsResult.value.json()) as ModelsResponse;
+        if (data.models.length > 0) setModels(data.models);
+      }
+
+      if (conversationsResult.status === 'fulfilled' && conversationsResult.value.ok) {
+        const page = (await conversationsResult.value.json()) as ConversationPage;
+        const conversations = summariesWithCurrentRunStatus(page.conversations);
+        synchronizeActiveRunIds(conversations);
+        setConversations(mergeConversations([], conversations));
+        setNextCursor(page.next_cursor);
+        const firstId = conversations[0]?.id ?? null;
+        setSelectedConversationId(firstId);
+        if (firstId) void loadHistory(firstId);
+      }
+      setIsInitializing(false);
     }
-  }, [messages]);
+    void initialize();
+    return () => {
+      active = false;
+    };
+  }, [loadHistory]);
+
+  useEffect(() => {
+    const runningConversationIds = conversations
+      .filter((conversation) => conversation.run_status === 'running')
+      .map((conversation) => conversation.id);
+    if (runningConversationIds.length === 0) return;
+    const revalidate = () => {
+      for (const conversationId of runningConversationIds) void loadHistory(conversationId);
+    };
+    const timer = window.setInterval(revalidate, 2_000);
+    return () => window.clearInterval(timer);
+  }, [conversations, loadHistory]);
+
+  const createConversation = useCallback(async () => {
+    const unused = conversations.find(
+      (conversation) =>
+        conversation.title === 'New chat'
+        && messagesByConversation[conversation.id]?.length === 0
+        && !streamingByConversation[conversation.id],
+    );
+    if (unused) {
+      setErrorsByConversation((current) => ({ ...current, [unused.id]: null }));
+      setSelectedConversationId(unused.id);
+      return unused;
+    }
+
+    const response = await apiFetch('/api/chat/conversations', {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw await responseError(response, `Unable to create conversation (${response.status})`);
+    }
+    const conversation = (await response.json()) as ConversationSummary;
+    setConversations((current) => mergeConversations(current, [conversation]));
+    setMessagesByConversation((current) => ({
+      ...current,
+      [conversation.id]: current[conversation.id] ?? [],
+    }));
+    setErrorsByConversation((current) => ({ ...current, [conversation.id]: null }));
+    setSelectedConversationId(conversation.id);
+    return conversation;
+  }, [conversations, messagesByConversation, streamingByConversation]);
+
+  const selectConversation = useCallback(
+    (conversationId: string) => {
+      setSelectedConversationId(conversationId);
+      setErrorsByConversation((current) => ({ ...current, [conversationId]: null }));
+      if (!(conversationId in messagesByConversation)) void loadHistory(conversationId);
+    },
+    [loadHistory, messagesByConversation],
+  );
+
+  const renameConversation = useCallback(async (conversationId: string, title: string) => {
+    const response = await apiFetch(`/api/chat/conversations/${conversationId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    if (!response.ok) {
+      throw await responseError(response, `Unable to rename conversation (${response.status})`);
+    }
+    const updated = (await response.json()) as ConversationSummary;
+    setConversations((current) => mergeConversations(current, [updated]));
+  }, []);
+
+  const setConversationPinned = useCallback(async (conversationId: string, pinned: boolean) => {
+    const response = await apiFetch(`/api/chat/conversations/${conversationId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinned }),
+    });
+    if (!response.ok) {
+      throw await responseError(response, `Unable to update conversation (${response.status})`);
+    }
+    const updated = (await response.json()) as ConversationSummary;
+    setConversations((current) => mergeConversations(current, [updated]));
+  }, []);
+
+  const deleteConversation = useCallback(
+    async (conversationId: string) => {
+      const response = await apiFetch(`/api/chat/conversations/${conversationId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw await responseError(response, `Unable to delete conversation (${response.status})`);
+      }
+      streamControllers.current.get(conversationId)?.abort();
+      runIdsByConversation.current.delete(conversationId);
+      setConversations((current) => {
+        const remaining = current.filter((conversation) => conversation.id !== conversationId);
+        setSelectedConversationId((selected) => {
+          if (selected !== conversationId) return selected;
+          const nextId = remaining[0]?.id ?? null;
+          if (nextId && !(nextId in messagesByConversation)) void loadHistory(nextId);
+          return nextId;
+        });
+        return remaining;
+      });
+      setMessagesByConversation((current) => {
+        const next = { ...current };
+        delete next[conversationId];
+        return next;
+      });
+    },
+    [loadHistory, messagesByConversation],
+  );
+
+  const loadMoreConversations = useCallback(async () => {
+    if (!nextCursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const response = await apiFetch(
+        `/api/chat/conversations?limit=20&cursor=${encodeURIComponent(nextCursor)}`,
+      );
+      if (!response.ok) {
+        throw await responseError(response, `Unable to load conversations (${response.status})`);
+      }
+      const page = (await response.json()) as ConversationPage;
+      const conversations = summariesWithCurrentRunStatus(page.conversations);
+      synchronizeActiveRunIds(conversations);
+      setConversations((current) => mergeConversations(current, conversations));
+      setNextCursor(page.next_cursor);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, nextCursor]);
 
   const append = useCallback(
-    async (userMessage: string) => {
-      if (!userMessage.trim() || isLoading) return;
+    async (userMessage: string, selectedModel = DEFAULT_MODEL) => {
+      const trimmedMessage = userMessage.trim();
+      if (!trimmedMessage) return;
 
-      const userMsg: ChatMessage = {
+      let conversation = conversations.find((item) => item.id === selectedConversationId);
+      if (!conversation) conversation = await createConversation();
+      const conversationId = conversation.id;
+      if (streamControllers.current.has(conversationId)) return;
+
+      const promptTimestamp = new Date().toISOString();
+      setConversations((current) =>
+        mergeConversations(current, [{ ...conversation, last_message_at: promptTimestamp }]),
+      );
+
+      const userMessageRecord: ChatMessage = {
         id: randomId(),
         role: 'user',
-        parts: [{ type: 'text', text: userMessage }],
+        status: 'completed',
+        parts: [{ type: StreamTypeEnum.TEXT, text: trimmedMessage }],
       };
       const assistantId = randomId();
-      const assistantMsg: ChatMessage = { id: assistantId, role: 'assistant', parts: [] };
+      const assistantMessage: ChatMessage = {
+        id: assistantId,
+        role: 'assistant',
+        status: 'streaming',
+        parts: [],
+      };
+      setMessagesByConversation((current) => ({
+        ...current,
+        [conversationId]: [...(current[conversationId] ?? []), userMessageRecord, assistantMessage],
+      }));
+      setErrorsByConversation((current) => ({ ...current, [conversationId]: null }));
+      setStreamingByConversation((current) => ({ ...current, [conversationId]: true }));
 
-      setMessages((prev) => [...prev, userMsg, assistantMsg]);
-      setIsLoading(true);
-      setError(null);
+      const controller = new AbortController();
+      streamControllers.current.set(conversationId, controller);
+      let resolvePendingRunId: PendingRunId['resolve'];
+      const pendingRunId = new Promise<string | null>((resolve) => {
+        resolvePendingRunId = resolve;
+      });
+      const pendingRun = { promise: pendingRunId, resolve: resolvePendingRunId! };
+      pendingRunIdsByConversation.current.set(conversationId, pendingRun);
+      const updateParts = (updater: (parts: MessagePart[]) => MessagePart[]) => {
+        setMessagesByConversation((current) => ({
+          ...current,
+          [conversationId]: (current[conversationId] ?? []).map((message) =>
+            message.id === assistantId
+              ? { ...message, parts: updater(message.parts) }
+              : message,
+          ),
+        }));
+      };
 
       try {
         const response = await apiFetch('/api/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
-            message: userMessage,
-            model,
-            thread_id: threadId.current,
+            message: trimmedMessage,
+            model: selectedModel,
+            thread_id: conversationId,
             kwargs: {
               return_reasoning_info: returnReasoning,
               return_func_call_start_info: returnFuncCallInfo,
@@ -91,155 +354,204 @@ export function useChat({
             },
           }),
         });
-
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw await responseError(response, `Chat request failed (${response.status})`);
         }
-
-        if (!response.body) {
-          throw new Error('No response body');
-        }
+        const runId = response.headers.get('x-run-id');
+        if (!runId) throw new Error('The chat response did not include a run identifier.');
+        runIdsByConversation.current.set(conversationId, runId);
+        pendingRun.resolve(runId);
+        if (!response.body) throw new Error('The chat response did not include a stream body.');
 
         const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let lineBuffer = '';
-
-        /**
-         * Immutably updates the parts of the assistant message currently being streamed.
-         * Called on every NDJSON event so the UI re-renders incrementally.
-         */
-        const updateParts = (updater: (prev: MessagePart[]) => MessagePart[]) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, parts: updater(m.parts) } : m)),
-          );
-        };
+        const parser = new NdjsonParser<StreamEvent>();
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
-          // Decode chunk and split into lines (NDJSON = one JSON object per line)
-          lineBuffer += decoder.decode(value, { stream: true });
-          const lines = lineBuffer.split('\n');
-          lineBuffer = lines.pop() ?? ''; // last element may be incomplete
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-
-            let event: StreamEvent;
-            try {
-              event = JSON.parse(line) as StreamEvent;
-            } catch {
-              continue; // skip malformed lines
-            }
-
+          for (const event of parser.push(value)) {
             updateParts((parts) => routeEvent(parts, event));
           }
         }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(msg);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, parts: [...m.parts, { type: 'error', message: msg }] }
-              : m,
+        for (const event of parser.finish()) {
+          updateParts((parts) => routeEvent(parts, event));
+        }
+        const finalStatus = stoppedRunIds.current.has(runId) ? 'interrupted' : 'completed';
+        setMessagesByConversation((current) => ({
+          ...current,
+          [conversationId]: (current[conversationId] ?? []).map((message) =>
+            message.id === assistantId ? { ...message, status: finalStatus } : message,
           ),
-        );
+        }));
+        if (finalStatus === 'completed') await loadHistory(conversationId);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const message = error instanceof Error ? error.message : String(error);
+        setErrorsByConversation((current) => ({ ...current, [conversationId]: message }));
+        updateParts((parts) => [...parts, { type: StreamTypeEnum.ERROR, message }]);
+        setMessagesByConversation((current) => ({
+          ...current,
+          [conversationId]: (current[conversationId] ?? []).map((item) =>
+            item.id === assistantId ? { ...item, status: 'failed' } : item,
+          ),
+        }));
       } finally {
-        setIsLoading(false);
+        if (pendingRunIdsByConversation.current.get(conversationId) === pendingRun) {
+          pendingRunIdsByConversation.current.delete(conversationId);
+          pendingRun.resolve(null);
+        }
+        if (streamControllers.current.get(conversationId) === controller) {
+          streamControllers.current.delete(conversationId);
+          const runId = runIdsByConversation.current.get(conversationId);
+          if (runId) stoppedRunIds.current.delete(runId);
+          runIdsByConversation.current.delete(conversationId);
+          setStreamingByConversation((current) => ({ ...current, [conversationId]: false }));
+        }
       }
     },
-    [isLoading, model, returnReasoning, returnFuncCallInfo],
+    [
+      conversations,
+      createConversation,
+      loadHistory,
+      messagesByConversation,
+      returnFuncCallInfo,
+      returnReasoning,
+      selectedConversationId,
+    ],
   );
 
-  /** Reset conversation — clears messages and generates a new thread_id. */
-  const reset = useCallback(() => {
-    setMessages([]);
-    setError(null);
-    threadId.current = randomId();
+  const stopConversation = useCallback(async (conversationId: string) => {
+    const runId = runIdsByConversation.current.get(conversationId)
+      ?? await pendingRunIdsByConversation.current.get(conversationId)?.promise;
+    if (!runId) throw new Error('The active run is no longer available.');
+    stoppedRunIds.current.add(runId);
+    let result: RunStatusResponse;
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.setItem(STORAGE_THREAD_KEY, threadId.current);
+      const response = await apiFetch(`/api/chat/runs/${runId}/stop?wait=true`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw await responseError(response, `Unable to stop run (${response.status})`);
       }
-    } catch {
-      // ignore
+      result = (await response.json()) as RunStatusResponse;
+    } catch (error) {
+      stoppedRunIds.current.delete(runId);
+      throw error;
     }
+    if (result.status === 'interrupted') {
+      setMessagesByConversation((current) => ({
+        ...current,
+        [conversationId]: (current[conversationId] ?? []).map((message) =>
+          message.role === 'assistant' && message.status === 'streaming'
+            ? { ...message, status: 'interrupted' }
+            : message,
+        ),
+      }));
+    }
+    streamControllers.current.get(conversationId)?.abort();
+    runIdsByConversation.current.delete(conversationId);
+    setStreamingByConversation((current) => ({ ...current, [conversationId]: false }));
+    setConversations((current) => current.map((conversation) =>
+      conversation.id === conversationId
+        ? { ...conversation, run_status: result.status, active_run_id: null }
+        : conversation,
+    ));
   }, []);
 
+  const selectedConversation =
+    conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
+  const messages = selectedConversationId
+    ? messagesByConversation[selectedConversationId] ?? []
+    : [];
+  const isLoading = selectedConversationId
+    ? Boolean(streamingByConversation[selectedConversationId])
+    : false;
+  const error = selectedConversationId ? errorsByConversation[selectedConversationId] ?? null : null;
+
   return {
+    conversations,
+    selectedConversation,
+    selectedConversationId,
     messages,
+    models,
     isLoading,
+    isInitializing,
+    isLoadingMore,
+    hasMoreConversations: nextCursor !== null,
     error,
+    streamingByConversation,
     append,
-    reset,
-    threadId: threadId.current,
+    createConversation,
+    selectConversation,
+    renameConversation,
+    setConversationPinned,
+    deleteConversation,
+    stopConversation,
+    loadMoreConversations,
   };
 }
 
-// ─── Event router ─────────────────────────────────────────────────────────────
-
-/**
- * Maps a single StreamEvent onto the current parts array and returns the new array.
- * Pure function — no side effects.
- */
-function routeEvent(parts: MessagePart[], event: StreamEvent): MessagePart[] {
-  const c = event.content;
+export function routeEvent(parts: MessagePart[], event: StreamEvent): MessagePart[] {
+  const content = event.content;
 
   switch (event.type) {
     case StreamTypeEnum.TEXT: {
-      const incoming = (c['text'] as string) ?? '';
+      const incoming = (content['text'] as string) ?? '';
       if (!incoming) return parts;
-      // Coalesce consecutive text tokens into a single TextPart for efficient rendering
       const last = parts[parts.length - 1];
       if (last?.type === StreamTypeEnum.TEXT) {
         return [...parts.slice(0, -1), { ...last, text: last.text + incoming }];
       }
       return [...parts, { type: StreamTypeEnum.TEXT, text: incoming }];
     }
-
     case StreamTypeEnum.REASONING: {
-      const incoming = (c['text'] as string) ?? '';
+      const incoming = (content['text'] as string) ?? '';
       if (!incoming.trim()) return parts;
-      // Coalesce consecutive reasoning tokens into a single ReasoningPart
       const last = parts[parts.length - 1];
       if (last?.type === StreamTypeEnum.REASONING) {
         return [...parts.slice(0, -1), { ...last, text: last.text + incoming }];
       }
       return [...parts, { type: StreamTypeEnum.REASONING, text: incoming }];
     }
-
     case StreamTypeEnum.FUNC_CALL_START:
-      return [...parts, { type: StreamTypeEnum.FUNC_CALL_START, calls: c as Record<string, unknown> }];
-
+      return [...parts, { type: StreamTypeEnum.FUNC_CALL_START, calls: content }];
     case StreamTypeEnum.FUNC_CALL_END:
       return [
         ...parts,
         {
           type: StreamTypeEnum.FUNC_CALL_END,
-          tool_call_id: c['tool_call_id'] as string,
-          name: c['name'] as string,
-          status: c['status'] as 'success' | 'error',
-          content: c['content'],
+          tool_call_id: content['tool_call_id'] as string,
+          name: content['name'] as string,
+          status: content['status'] as 'success' | 'error',
+          content: content['content'],
         },
       ];
-
     case StreamTypeEnum.UI:
-      return [...parts, { type: StreamTypeEnum.UI, artifact: (c['artifact'] as Record<string, unknown>) ?? {} }];
-
+      return [
+        ...parts,
+        {
+          type: StreamTypeEnum.UI,
+          artifact: (content['artifact'] as Record<string, unknown>) ?? {},
+        },
+      ];
     case StreamTypeEnum.INTERACTIVE:
       return [
         ...parts,
-        { type: StreamTypeEnum.INTERACTIVE, artifact: (c['artifact'] as Record<string, unknown>) ?? {} },
+        {
+          type: StreamTypeEnum.INTERACTIVE,
+          artifact: (content['artifact'] as Record<string, unknown>) ?? {},
+        },
       ];
-
     case StreamTypeEnum.MONITOR:
-      return [...parts, { type: StreamTypeEnum.MONITOR, usage: c }];
-
+      return [...parts, { type: StreamTypeEnum.MONITOR, usage: content }];
     case StreamTypeEnum.ERROR:
-      return [...parts, { type: StreamTypeEnum.ERROR, message: JSON.stringify(c) }];
-
+      return [
+        ...parts,
+        {
+          type: StreamTypeEnum.ERROR,
+          message: typeof content['message'] === 'string' ? content['message'] : JSON.stringify(content),
+        },
+      ];
     default:
       return parts;
   }

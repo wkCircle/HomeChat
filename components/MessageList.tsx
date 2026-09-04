@@ -46,7 +46,14 @@ function AvatarModal({ open, onClose, src, alt }: { open: boolean; onClose: () =
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative h-[min(70vh,560px)] w-[min(90vw,560px)]">
-          <Image src={src} alt={alt} fill className="rounded-lg object-contain" priority />
+          <Image
+            src={src}
+            alt={alt}
+            fill
+            sizes="(max-width: 640px) 90vw, 560px"
+            className="rounded-lg object-contain"
+            priority
+          />
         </div>
         <button
           onClick={onClose}
@@ -62,11 +69,11 @@ function AvatarModal({ open, onClose, src, alt }: { open: boolean; onClose: () =
 
 function ReasoningBlock({ text }: { text: string }) {
   return (
-    <details className="my-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm">
-      <summary className="cursor-pointer font-medium text-purple-700 select-none">
+    <details className="my-2 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-sm dark:border-purple-500/30 dark:bg-purple-950/30">
+      <summary className="cursor-pointer font-medium text-purple-700 select-none dark:text-purple-300">
         💭 Reasoning
       </summary>
-      <p className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-purple-900">{text}</p>
+      <p className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-purple-900 dark:text-purple-200">{text}</p>
     </details>
   );
 }
@@ -136,7 +143,7 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
       <button
         type="button"
         onClick={onAvatarClick}
-        className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-indigo-100 ring-1 ring-transparent outline-none transition focus-visible:ring-indigo-400"
+        className="mt-1 h-7 w-7 shrink-0 overflow-hidden rounded-full bg-indigo-100 ring-1 ring-transparent outline-none transition focus-visible:ring-indigo-400 dark:bg-indigo-500/20"
         aria-label="View agent portrait"
       >
         <Image src="/avatars/pikachu_redsofa_2.jpeg" alt="Agent portrait" width={28} height={28} className="h-full w-full object-cover" priority />
@@ -188,6 +195,16 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
             <span className="text-gray-400">Working…</span>
           </span>
         )}
+        {msg.status === 'interrupted' && !isLoading && (
+          <span className="inline-block rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            Stopped
+          </span>
+        )}
+        {msg.status === 'failed' && !isLoading && (
+          <span className="inline-block rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+            Failed
+          </span>
+        )}
       </div>
     </div>
   );
@@ -197,7 +214,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
   const text = msg.parts.find((p) => p.type === 'text')?.text ?? '';
   return (
     <div className="flex justify-end">
-      <div className="max-w-full sm:max-w-xl rounded-2xl bg-indigo-500 px-4 py-2 text-sm text-white break-words whitespace-pre-wrap">
+      <div className="max-w-full rounded-2xl bg-indigo-500 px-4 py-2 text-sm text-white break-words whitespace-pre-wrap sm:max-w-xl">
         {text}
       </div>
     </div>

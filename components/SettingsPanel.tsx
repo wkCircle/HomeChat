@@ -55,7 +55,7 @@ export function SettingsPanel() {
         onClick={() => setOpen((o) => !o)}
         title="Settings"
         aria-label="Settings"
-        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-700"
       >
         <GearIcon />
       </button>

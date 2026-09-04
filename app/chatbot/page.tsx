@@ -1,191 +1,260 @@
-"use client";
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { MessageList } from '@/components/MessageList';
+import { ModelSelector } from '@/components/ModelSelector';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { DEFAULT_MODEL } from '@/lib/types';
 import { useChat } from '@/lib/useChat';
 
-export default function ChatPage() {
-  const { messages, isLoading, error, append, reset } = useChat({
-    model: 'gpt-5.1',
-    returnReasoning: true,
-    returnFuncCallInfo: true,
-  });
+function MenuIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5">
+      <path d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
 
+export default function ChatPage() {
+  const chat = useChat({ returnReasoning: true, returnFuncCallInfo: true });
   const [input, setInput] = useState('');
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODEL);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isMobileInputMode, setIsMobileInputMode] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [isMobileInputMode, setIsMobileInputMode] = useState(false);
 
-  // Auto-scroll to bottom on new content only if already near bottom
   useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+    const stored = window.localStorage.getItem('homechat:sidebar:collapsed');
+    setSidebarCollapsed(stored === 'true');
+  }, []);
+
+  useEffect(() => {
+    if (!chat.models.includes(selectedModel)) {
+      setSelectedModel(chat.models[0] ?? DEFAULT_MODEL);
+    }
+  }, [chat.models, selectedModel]);
+
+  useEffect(() => {
+    const element = mainRef.current;
+    if (!element) return;
+    const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 16;
     if (atBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [chat.messages]);
 
-  // Track scroll to toggle the floating "scroll to bottom" button
   useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
+    if (!chat.selectedConversationId) return;
+    const element = mainRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+    setShowScrollToBottom(false);
+  }, [chat.selectedConversationId]);
+
+  useEffect(() => {
+    const element = mainRef.current;
+    if (!element) return;
     const onScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 16;
+      const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 16;
       setShowScrollToBottom(!atBottom);
     };
     onScroll();
-    el.addEventListener('scroll', onScroll, { passive: true });
-    const onResize = () => onScroll();
-    window.addEventListener('resize', onResize);
+    element.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
     return () => {
-      el.removeEventListener('scroll', onScroll as EventListener);
-      window.removeEventListener('resize', onResize);
+      element.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
     };
   }, []);
 
-  // Autosize textarea height up to a maximum, then allow internal scrolling
   const adjustTextareaHeight = () => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    const maxHeight = 160; // px, approx 6-8 lines depending on font
-    const newHeight = Math.min(ta.scrollHeight, maxHeight);
-    ta.style.height = `${newHeight}px`;
-    ta.style.overflowY = ta.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    const maximumHeight = 160;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maximumHeight)}px`;
+    textarea.style.overflowY = textarea.scrollHeight > maximumHeight ? 'auto' : 'hidden';
   };
 
   useEffect(() => {
     adjustTextareaHeight();
   }, [input]);
 
-  // Detect mobile-like input mode (touch-only pointer). Avoid viewport width heuristics.
   useEffect(() => {
-    const check = () => {
-      const mobileLike = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
-      setIsMobileInputMode(Boolean(mobileLike));
+    const checkInputMode = () => {
+      setIsMobileInputMode(window.matchMedia('(hover: none) and (pointer: coarse)').matches);
     };
-    check();
-    window.addEventListener('resize', check);
-    window.addEventListener('orientationchange', check as any);
+    checkInputMode();
+    window.addEventListener('resize', checkInputMode);
+    window.addEventListener('orientationchange', checkInputMode);
     return () => {
-      window.removeEventListener('resize', check);
-      window.removeEventListener('orientationchange', check as any);
+      window.removeEventListener('resize', checkInputMode);
+      window.removeEventListener('orientationchange', checkInputMode);
     };
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const msg = input.trim();
-    if (!msg || isLoading) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const message = input.trim();
+    if (!message || chat.isLoading) return;
     setInput('');
-    await append(msg);
+    await chat.append(message, selectedModel);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e as any).isComposing || e.key === 'Process') {
-      // IME composition in progress; let Enter confirm composition
-      return;
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing || event.key === 'Process' || isMobileInputMode) return;
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      void handleSubmit(event as unknown as React.FormEvent);
     }
-    if (isMobileInputMode) {
-      // On mobile: Enter inserts newline; only button sends
-      return;
-    } else {
-      // Desktop: Enter sends; Shift+Enter newline
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit(e as unknown as React.FormEvent);
-      }
+  };
+
+  const runAction = async (action: () => Promise<void>) => {
+    setActionError(null);
+    try {
+      await action();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
     }
+  };
+
+  const changeCollapsed = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed);
+    window.localStorage.setItem('homechat:sidebar:collapsed', String(collapsed));
   };
 
   return (
-    <div className="flex min-w-0 h-screen flex-col">
-      {/* Header */}
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-white px-3 py-3 shadow-sm sm:px-6 dark:border-gray-700 dark:bg-gray-800">
-        <h1 className="min-w-0 text-lg font-semibold text-indigo-600">Pikachu HomeAI</h1>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button
-            onClick={reset}
-            className="rounded px-3 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-          >
-            New chat
-          </button>
-          <button
-            onClick={async () => {
-              try {
+    <div className="flex h-screen min-w-0 overflow-hidden bg-gray-100 dark:bg-gray-900">
+      <ConversationSidebar
+        conversations={chat.conversations}
+        selectedConversationId={chat.selectedConversationId}
+        streamingByConversation={chat.streamingByConversation}
+        collapsed={sidebarCollapsed}
+        mobileOpen={mobileSidebarOpen}
+        hasMore={chat.hasMoreConversations}
+        isLoadingMore={chat.isLoadingMore}
+        onCreate={() => runAction(async () => { await chat.createConversation(); })}
+        onSelect={chat.selectConversation}
+        onRename={chat.renameConversation}
+        onPin={chat.setConversationPinned}
+        onDelete={chat.deleteConversation}
+        onStop={(conversationId) => runAction(() => chat.stopConversation(conversationId))}
+        onLoadMore={() => runAction(chat.loadMoreConversations)}
+        onCollapsedChange={changeCollapsed}
+        onMobileClose={() => setMobileSidebarOpen(false)}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-3 md:px-5 dark:border-gray-700 dark:bg-gray-800">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              aria-label="Open conversation sidebar"
+              title="Conversations"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 md:hidden dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <MenuIcon />
+            </button>
+            <h1 className="truncate text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+              {chat.selectedConversation?.title ?? 'Pikachu HomeAI'}
+            </h1>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => void runAction(async () => {
                 await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-              } finally {
                 window.location.href = '/login';
-              }
-            }}
-            className="rounded px-3 py-1 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-          >
-            Logout
-          </button>
-          <SettingsPanel />
-        </div>
-      </header>
+              })}
+              className="rounded-md px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              Logout
+            </button>
+            <SettingsPanel />
+          </div>
+        </header>
 
-      {/* Message area */}
-      <main
-        ref={mainRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 sm:py-6"
-        // Improve touch scrolling on mobile; prevent accidental horizontal panning
-        style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-      >
-        <div className="mx-auto w-full min-w-0 max-w-4xl lg:max-w-5xl xl:max-w-6xl">
-          {messages.length === 0 ? (
-            <p className="mt-24 text-center text-gray-400">Ask me anything to get started.</p>
-          ) : (
-            <MessageList messages={messages} isLoading={isLoading} />
+        <main ref={mainRef} className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 py-5 sm:px-5" style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+          <div className="mx-auto w-full min-w-0 max-w-4xl lg:max-w-5xl">
+            {chat.isInitializing ? (
+              <p className="mt-24 text-center text-sm text-gray-400">Loading conversations...</p>
+            ) : chat.messages.length === 0 ? (
+              <div className="mx-auto mt-20 max-w-lg text-center">
+                <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">What can I help with?</h2>
+              </div>
+            ) : (
+              <MessageList messages={chat.messages} isLoading={chat.isLoading} />
+            )}
+            {(chat.error || actionError) && (
+              <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+                {chat.error ?? actionError}
+              </p>
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          {showScrollToBottom && chat.messages.length > 0 && (
+            <button
+              type="button"
+              aria-label="Scroll to latest message"
+              title="Scroll to latest"
+              onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
+              className="fixed bottom-24 right-4 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg ring-1 ring-indigo-400/50 hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:right-6"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" /></svg>
+            </button>
           )}
-          {error && (
-            <p className="mt-3 rounded bg-red-50 px-3 py-2 text-sm text-red-600">⚠ {error}</p>
-          )}
-          <div ref={bottomRef} />
-        </div>
+        </main>
 
-        {/* Scroll-to-bottom floating button */}
-        {showScrollToBottom && messages.length > 0 && (
-          <button
-            type="button"
-            aria-label="Scroll to latest message"
-            onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
-            className="fixed right-4 bottom-24 z-30 inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg ring-1 ring-indigo-400/50 hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 sm:right-6"
+        <footer className="shrink-0 border-t border-gray-200 bg-white px-3 py-3 sm:px-5 dark:border-gray-700 dark:bg-gray-800">
+          <form
+            onSubmit={handleSubmit}
+            className="mx-auto w-full max-w-4xl rounded-2xl border border-gray-300 bg-white p-2 shadow-sm focus-within:border-indigo-400 focus-within:ring-1 focus-within:ring-indigo-400 lg:max-w-5xl dark:border-gray-600 dark:bg-gray-700"
           >
-            {/* Down arrow icon */}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-            </svg>
-          </button>
-        )}
-      </main>
-
-      {/* Input */}
-      <footer className="border-t bg-white px-3 py-4 sm:px-4 dark:border-gray-700 dark:bg-gray-800">
-        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-4xl flex-col items-stretch gap-2 sm:flex-row sm:items-end lg:max-w-5xl xl:max-w-6xl">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isMobileInputMode ? 'Message Pikachu HomeAI… (Tap Send to submit; Enter for newline)' : 'Message Pikachu HomeAI… (Enter to send, Shift+Enter for newline)'}
-            enterKeyHint={isMobileInputMode ? 'enter' : 'send'}
-            rows={1}
-            className="h-auto max-h-40 min-h-[44px] w-full resize-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 sm:flex-1 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 dark:placeholder-gray-400"
-            onInput={adjustTextareaHeight}
-          />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="w-full rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40 sm:w-auto"
-          >
-            {isLoading ? '…' : 'Send'}
-          </button>
-        </form>
-      </footer>
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={handleKeyDown}
+              onInput={adjustTextareaHeight}
+              placeholder="Message Pikachu HomeAI"
+              enterKeyHint={isMobileInputMode ? 'enter' : 'send'}
+              rows={1}
+              className="block max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-sm text-gray-900 focus:outline-none dark:text-gray-100 dark:placeholder:text-gray-400"
+            />
+            <div className="flex items-center justify-end gap-1">
+              <ModelSelector
+                models={chat.models}
+                selectedModel={selectedModel}
+                onSelect={setSelectedModel}
+              />
+              {chat.isLoading && chat.selectedConversationId ? (
+                <button
+                  type="button"
+                  onClick={() => void runAction(() => chat.stopConversation(chat.selectedConversationId!))}
+                  className="h-10 shrink-0 rounded-lg border border-red-300 px-5 text-sm font-semibold text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950"
+                >
+                  Stop
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  aria-label="Send message"
+                  title="Send message"
+                  disabled={!input.trim()}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-sm text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <i aria-hidden="true" className="fa-solid fa-paper-plane" />
+                </button>
+              )}
+            </div>
+          </form>
+        </footer>
+      </div>
     </div>
   );
 }
