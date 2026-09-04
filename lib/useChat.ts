@@ -226,6 +226,19 @@ export function useChat({
     setConversations((current) => mergeConversations(current, [updated]));
   }, []);
 
+  const setConversationPinned = useCallback(async (conversationId: string, pinned: boolean) => {
+    const response = await apiFetch(`/api/chat/conversations/${conversationId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinned }),
+    });
+    if (!response.ok) {
+      throw await responseError(response, `Unable to update conversation (${response.status})`);
+    }
+    const updated = (await response.json()) as ConversationSummary;
+    setConversations((current) => mergeConversations(current, [updated]));
+  }, []);
+
   const deleteConversation = useCallback(
     async (conversationId: string) => {
       const response = await apiFetch(`/api/chat/conversations/${conversationId}`, {
@@ -481,6 +494,7 @@ export function useChat({
     createConversation,
     selectConversation,
     renameConversation,
+    setConversationPinned,
     deleteConversation,
     stopConversation,
     loadMoreConversations,

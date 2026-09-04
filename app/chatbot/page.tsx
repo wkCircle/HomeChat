@@ -139,6 +139,7 @@ export default function ChatPage() {
         onCreate={() => runAction(async () => { await chat.createConversation(); })}
         onSelect={chat.selectConversation}
         onRename={chat.renameConversation}
+        onPin={chat.setConversationPinned}
         onDelete={chat.deleteConversation}
         onStop={(conversationId) => runAction(() => chat.stopConversation(conversationId))}
         onLoadMore={() => runAction(chat.loadMoreConversations)}

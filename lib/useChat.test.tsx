@@ -10,6 +10,7 @@ vi.mock('./api', () => ({ default: apiFetchMock }));
 const conversation: ConversationSummary = {
   id: 'conversation-1',
   title: 'New chat',
+  pinned: false,
   run_status: null,
   active_run_id: null,
   created_at: '2026-09-04T00:00:00Z',

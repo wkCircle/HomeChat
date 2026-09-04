@@ -8,6 +8,7 @@ function conversation(id: string, lastMessageAt: string): ConversationSummary {
   return {
     id,
     title: id,
+    pinned: false,
     run_status: null,
     active_run_id: null,
     created_at: lastMessageAt,

@@ -15,6 +15,7 @@ interface ConversationSidebarProps {
   onCreate: () => Promise<void>;
   onSelect: (conversationId: string) => void;
   onRename: (conversationId: string, title: string) => Promise<void>;
+  onPin: (conversationId: string, pinned: boolean) => Promise<void>;
   onDelete: (conversationId: string) => Promise<void>;
   onStop: (conversationId: string) => Promise<void>;
   onLoadMore: () => Promise<void>;
@@ -22,13 +23,15 @@ interface ConversationSidebarProps {
   onMobileClose: () => void;
 }
 
-function Icon({ name }: { name: 'add' | 'collapse' | 'expand' | 'more' | 'chat' }) {
+function Icon({ name }: { name: 'add' | 'collapse' | 'expand' | 'more' | 'chat' | 'pin' | 'pinned' }) {
   const paths = {
     add: <path d="M12 5v14M5 12h14" />,
     collapse: <path d="m15 18-6-6 6-6" />,
     expand: <path d="m9 18 6-6-6-6" />,
     more: <path d="M12 6.5h.01M12 12h.01M12 17.5h.01" strokeWidth="3" />,
     chat: <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />,
+    pin: <path d="M12 17v5M8 3h8l-1 6 3 3v2H6v-2l3-3-1-6Z" />,
+    pinned: <path d="M12 17v5M8 3h8l-1 6 3 3v2H6v-2l3-3-1-6Z" fill="currentColor" />,
   };
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
@@ -105,6 +108,95 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
     setDialog({ kind: 'delete', conversation });
   };
 
+  const pinnedConversations = props.conversations.filter((conversation) => conversation.pinned);
+  const recentConversations = props.conversations.filter((conversation) => !conversation.pinned);
+
+  const renderConversation = (conversation: ConversationSummary) => {
+    const selected = conversation.id === props.selectedConversationId;
+    const running = Boolean(props.streamingByConversation[conversation.id]) || conversation.run_status === 'running';
+    return (
+      <div
+        key={conversation.id}
+        ref={menuConversationId === conversation.id ? menuContainerRef : null}
+        className="group relative mb-1"
+      >
+        <button
+          type="button"
+          onClick={() => {
+            props.onSelect(conversation.id);
+            props.onMobileClose();
+          }}
+          title={conversation.title}
+          className={`flex h-11 w-full min-w-0 items-center rounded-md text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+            selected
+              ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-700 dark:text-indigo-300'
+              : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+          } ${props.collapsed ? 'md:justify-center md:px-0' : 'gap-2 pl-3 pr-16'}`}
+        >
+          {running ? (
+            <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-emerald-500" aria-label="Running" />
+          ) : (
+            <Icon name="chat" />
+          )}
+          <span className={`min-w-0 flex-1 truncate ${props.collapsed ? 'md:hidden' : ''}`}>{conversation.title}</span>
+          <time
+            dateTime={conversation.last_message_at}
+            title={new Date(conversation.last_message_at).toLocaleString()}
+            className={`shrink-0 text-xs text-gray-400 dark:text-gray-500 ${props.collapsed ? 'md:hidden' : ''}`}
+          >
+            {formatConversationAge(conversation.last_message_at, now)}
+          </time>
+        </button>
+        <button
+          type="button"
+          aria-label={conversation.pinned ? `Unpin ${conversation.title}` : `Pin ${conversation.title}`}
+          title={conversation.pinned ? 'Unpin conversation' : 'Pin conversation'}
+          onClick={() => void props.onPin(conversation.id, !conversation.pinned)}
+          className={`absolute right-8 top-2 hidden h-7 w-7 items-center justify-center rounded-md text-gray-500 opacity-0 transition-opacity hover:bg-gray-200 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 group-hover:opacity-100 dark:text-gray-400 dark:hover:bg-gray-600 [&>svg]:h-4 [&>svg]:w-4 ${props.collapsed ? 'md:hidden' : 'md:flex'}`}
+        >
+          <Icon name={conversation.pinned ? 'pinned' : 'pin'} />
+        </button>
+        <button
+          type="button"
+          aria-label={`Actions for ${conversation.title}`}
+          title="Conversation actions"
+          onClick={() => setMenuConversationId((current) => current === conversation.id ? null : conversation.id)}
+          className={`absolute right-1 top-2 h-7 w-7 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-600 [&>svg]:h-4 [&>svg]:w-4 ${props.collapsed ? 'flex md:hidden' : 'flex'}`}
+        >
+          <Icon name="more" />
+        </button>
+        {menuConversationId === conversation.id && (
+          <div className="absolute right-1 top-10 z-30 w-32 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-800">
+            <button type="button" onClick={() => openRename(conversation)} className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700">Rename</button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuConversationId(null);
+                void props.onPin(conversation.id, !conversation.pinned);
+              }}
+              className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              {conversation.pinned ? 'Unpin' : 'Pin'}
+            </button>
+            {running && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuConversationId(null);
+                  void props.onStop(conversation.id);
+                }}
+                className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Stop
+              </button>
+            )}
+            <button type="button" onClick={() => openDelete(conversation)} className="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-gray-700">Delete</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const submitDialog = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!dialog || isSubmitting) return;
@@ -178,72 +270,16 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
           </div>
 
           <nav className={`min-h-0 flex-1 overflow-y-auto px-2 pb-3 ${props.collapsed ? 'md:px-2' : ''}`} aria-label="Conversations">
-            {props.conversations.map((conversation) => {
-              const selected = conversation.id === props.selectedConversationId;
-              const running = Boolean(props.streamingByConversation[conversation.id]) || conversation.run_status === 'running';
-              return (
-                <div
-                  key={conversation.id}
-                  ref={menuConversationId === conversation.id ? menuContainerRef : null}
-                  className="relative mb-1"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      props.onSelect(conversation.id);
-                      props.onMobileClose();
-                    }}
-                    title={conversation.title}
-                    className={`flex h-11 w-full min-w-0 items-center rounded-md text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                      selected
-                        ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-700 dark:text-indigo-300'
-                        : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
-                    } ${props.collapsed ? 'md:justify-center md:px-0' : 'gap-2 pl-3 pr-10'}`}
-                  >
-                    {running ? (
-                      <span className="h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-emerald-500" aria-label="Running" />
-                    ) : (
-                      <Icon name="chat" />
-                    )}
-                    <span className={`min-w-0 flex-1 truncate ${props.collapsed ? 'md:hidden' : ''}`}>{conversation.title}</span>
-                    <time
-                      dateTime={conversation.last_message_at}
-                      title={new Date(conversation.last_message_at).toLocaleString()}
-                      className={`shrink-0 text-xs text-gray-400 dark:text-gray-500 ${props.collapsed ? 'md:hidden' : ''}`}
-                    >
-                      {formatConversationAge(conversation.last_message_at, now)}
-                    </time>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Actions for ${conversation.title}`}
-                    title="Conversation actions"
-                    onClick={() => setMenuConversationId((current) => current === conversation.id ? null : conversation.id)}
-                    className={`absolute right-1 top-1 h-9 w-9 items-center justify-center rounded-md text-gray-500 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-600 ${props.collapsed ? 'flex md:hidden' : 'flex'}`}
-                  >
-                    <Icon name="more" />
-                  </button>
-                  {menuConversationId === conversation.id && (
-                    <div className="absolute right-1 top-10 z-30 w-32 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-800">
-                      <button type="button" onClick={() => openRename(conversation)} className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700">Rename</button>
-                      {running && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMenuConversationId(null);
-                            void props.onStop(conversation.id);
-                          }}
-                          className="block w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700"
-                        >
-                          Stop
-                        </button>
-                      )}
-                      <button type="button" onClick={() => openDelete(conversation)} className="block w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-gray-700">Delete</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {pinnedConversations.length > 0 && (
+              <section aria-labelledby="pinned-conversations">
+                <h2 id="pinned-conversations" className={`mb-1 px-3 pt-2 text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 ${props.collapsed ? 'md:hidden' : ''}`}>Pinned</h2>
+                {pinnedConversations.map(renderConversation)}
+              </section>
+            )}
+            <section aria-labelledby="recent-conversations">
+              <h2 id="recent-conversations" className={`mb-1 px-3 pt-2 text-xs font-semibold uppercase text-gray-400 dark:text-gray-500 ${props.collapsed ? 'md:hidden' : ''}`}>Recents</h2>
+              {recentConversations.map(renderConversation)}
+            </section>
             {props.hasMore && !props.collapsed && (
               <button
                 type="button"

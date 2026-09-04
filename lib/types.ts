@@ -89,6 +89,7 @@ export interface ModelsResponse {
 export interface ConversationSummary {
   id: string;
   title: string;
+  pinned: boolean;
   run_status: RunStatus | null;
   active_run_id: string | null;
   created_at: string;
