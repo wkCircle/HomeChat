@@ -48,6 +48,7 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const panelRef = useRef<HTMLElement>(null);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
   const newChatRef = useRef<HTMLButtonElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,6 +81,17 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [dialog, isSubmitting]);
+
+  useEffect(() => {
+    if (!menuConversationId) return;
+    const closeOnOutsideMouseDown = (event: MouseEvent) => {
+      if (event.target instanceof Node && !menuContainerRef.current?.contains(event.target)) {
+        setMenuConversationId(null);
+      }
+    };
+    document.addEventListener('mousedown', closeOnOutsideMouseDown);
+    return () => document.removeEventListener('mousedown', closeOnOutsideMouseDown);
+  }, [menuConversationId]);
 
   const openRename = (conversation: ConversationSummary) => {
     setMenuConversationId(null);
@@ -170,7 +182,11 @@ export function ConversationSidebar(props: ConversationSidebarProps) {
               const selected = conversation.id === props.selectedConversationId;
               const running = Boolean(props.streamingByConversation[conversation.id]) || conversation.run_status === 'running';
               return (
-                <div key={conversation.id} className="relative mb-1">
+                <div
+                  key={conversation.id}
+                  ref={menuConversationId === conversation.id ? menuContainerRef : null}
+                  className="relative mb-1"
+                >
                   <button
                     type="button"
                     onClick={() => {

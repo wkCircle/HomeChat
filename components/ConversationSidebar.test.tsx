@@ -130,6 +130,36 @@ describe('ConversationSidebar', () => {
     expect(titleInput).toHaveValue('hello');
   });
 
+  it('closes an action menu when the user clicks outside its conversation', async () => {
+    const user = userEvent.setup();
+    const view = render(
+      <ConversationSidebar
+        conversations={[conversation]}
+        selectedConversationId={conversation.id}
+        streamingByConversation={{}}
+        collapsed={false}
+        mobileOpen
+        hasMore={false}
+        isLoadingMore={false}
+        onCreate={vi.fn()}
+        onSelect={vi.fn()}
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
+        onStop={vi.fn()}
+        onLoadMore={vi.fn()}
+        onCollapsedChange={vi.fn()}
+        onMobileClose={vi.fn()}
+      />,
+    );
+
+    const sidebar = within(view.container);
+    await user.click(sidebar.getByRole('button', { name: 'Actions for New chat' }));
+    expect(sidebar.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
+
+    await user.click(sidebar.getByRole('button', { name: 'New conversation' }));
+    expect(sidebar.queryByRole('button', { name: 'Rename' })).not.toBeInTheDocument();
+  });
+
   it('stops the selected active conversation from its action menu', async () => {
     const user = userEvent.setup();
     const onStop = vi.fn().mockResolvedValue(undefined);
