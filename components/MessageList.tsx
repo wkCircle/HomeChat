@@ -46,7 +46,14 @@ function AvatarModal({ open, onClose, src, alt }: { open: boolean; onClose: () =
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative h-[min(70vh,560px)] w-[min(90vw,560px)]">
-          <Image src={src} alt={alt} fill className="rounded-lg object-contain" priority />
+          <Image
+            src={src}
+            alt={alt}
+            fill
+            sizes="(max-width: 640px) 90vw, 560px"
+            className="rounded-lg object-contain"
+            priority
+          />
         </div>
         <button
           onClick={onClose}
