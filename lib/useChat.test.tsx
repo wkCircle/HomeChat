@@ -47,6 +47,55 @@ function initializeResponses(history: ConversationHistory) {
 }
 
 describe('useChat stop behavior', () => {
+  it('loads the AI-generated title after the first stream without renaming locally', async () => {
+    const generatedConversation = { ...conversation, title: 'Annual Home Maintenance Plan' };
+    let historyRequests = 0;
+    apiFetchMock.mockImplementation((path: string, options?: RequestInit) => {
+      if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-5.1'] }));
+      if (path === '/api/chat/conversations?limit=20') {
+        return Promise.resolve(jsonResponse({ conversations: [conversation], next_cursor: null }));
+      }
+      if (path === '/api/chat/conversations/conversation-1/messages') {
+        historyRequests += 1;
+        return Promise.resolve(jsonResponse(historyRequests === 1
+          ? { conversation, messages: [], truncated: false }
+          : {
+            conversation: generatedConversation,
+            messages: [{
+              id: 'user-1', role: 'user', ordinal: 0, status: 'completed',
+              parts: [{
+                id: 'part-1', position: 0, type: 'text',
+                payload: { text: 'Plan annual maintenance' },
+                created_at: '2026-09-04T00:00:00Z',
+              }],
+              created_at: '2026-09-04T00:00:00Z',
+              updated_at: '2026-09-04T00:00:00Z',
+            }],
+            truncated: false,
+          }));
+      }
+      if (path === '/api/chat/stream') {
+        expect(options?.method).toBe('POST');
+        return Promise.resolve(new Response(
+          '{"type":"text","content":{"text":"Done"},"metadata":{}}\n',
+          { headers: { 'X-Run-ID': 'run-1' } },
+        ));
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    const { result } = renderHook(() => useChat());
+    await waitFor(() => expect(result.current.isInitializing).toBe(false));
+
+    await act(async () => {
+      await result.current.append('Plan annual maintenance');
+    });
+
+    expect(result.current.selectedConversation?.title).toBe('Annual Home Maintenance Plan');
+    expect(historyRequests).toBe(2);
+    expect(apiFetchMock.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
+  });
+
   it('restores persisted chart and table artifacts from conversation history', async () => {
     const chart = {
       type: 'graph', renderer: 'plotly', format: 'json',

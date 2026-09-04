@@ -41,11 +41,6 @@ function storedMessageToChatMessage(message: StoredMessage): ChatMessage {
   };
 }
 
-function initialTitle(message: string): string {
-  const normalized = message.replace(/\s+/g, ' ').trim();
-  return normalized.length > 50 ? `${normalized.slice(0, 47).trimEnd()}...` : normalized;
-}
-
 interface PendingRunId {
   promise: Promise<string | null>;
   resolve: (runId: string | null) => void;
@@ -303,12 +298,6 @@ export function useChat({
         mergeConversations(current, [{ ...conversation, last_message_at: promptTimestamp }]),
       );
 
-      const existingMessages = messagesByConversation[conversationId] ?? [];
-      if (existingMessages.length === 0 && conversation.title === 'New chat') {
-        const title = initialTitle(trimmedMessage);
-        void renameConversation(conversationId, title).catch(() => undefined);
-      }
-
       const userMessageRecord: ChatMessage = {
         id: randomId(),
         role: 'user',
@@ -394,6 +383,7 @@ export function useChat({
             message.id === assistantId ? { ...message, status: finalStatus } : message,
           ),
         }));
+        if (finalStatus === 'completed') await loadHistory(conversationId);
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
@@ -422,8 +412,8 @@ export function useChat({
     [
       conversations,
       createConversation,
+      loadHistory,
       messagesByConversation,
-      renameConversation,
       returnFuncCallInfo,
       returnReasoning,
       selectedConversationId,

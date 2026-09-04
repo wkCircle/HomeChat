@@ -163,8 +163,10 @@ responsive overflow controls for narrow viewports.
 HomeAI creates each conversation UUID and uses it as the LangGraph `thread_id`. `useChat` keeps
 separate message caches and stream controllers by conversation, so selecting another conversation
 does not abort an active producer. Conversation list/history endpoints restore persisted status and
-rendered output after reload. The stream response exposes `X-Run-ID`; Stop sends the owner-scoped
-run request, waits for interruption to settle, and retains already-persisted partial output.
+rendered output after reload. After the first stream completes, HomeChat reloads the authoritative
+history so HomeAI's AI-generated title replaces the temporary `New chat` label. The stream response
+exposes `X-Run-ID`; Stop sends the owner-scoped run request, waits for interruption to settle, and
+retains already-persisted partial output.
 
 The model selector belongs to the composer, not stored conversation metadata. HomeChat sends the
 current model explicitly with every run and does not change the selection when switching
