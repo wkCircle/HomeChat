@@ -1,6 +1,7 @@
 # Home Agent — Frontend (HomeChat)
 
-A Next.js chat UI that streams responses from the Home Agent FastAPI backend.
+A Next.js chat UI with durable, user-owned conversations streamed from the Home Agent FastAPI
+backend.
 
 This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the browser always calls the UI origin (`/api/...`). The proxy forwards to the backend using a runtime environment variable, which means you don’t need client-side `NEXT_PUBLIC_*` variables.
 
@@ -72,6 +73,10 @@ npm test -- --watch
 
 Tests are run with Vitest. Unit tests are colocated with their source files using the
 `.test.ts` or `.test.tsx` suffix; shared test setup lives under `tests/`.
+
+Before release, also verify the sidebar at desktop and mobile widths, including its overlay,
+focus behavior, collapse preference, long conversation titles, chart/table overflow, and the
+composer controls. Then run the production build.
 
 ---
 
@@ -150,7 +155,17 @@ Consecutive `text` events are merged into a single `TextPart` in state rather th
 Each `ChatMessage` holds a `parts` array instead of a single string. This maps naturally to the multi-type stream — a single assistant turn can contain reasoning blocks, tool call steps, UI artifacts, and text, all rendered in order.
 
 ### Extensible artifact rendering
-`ui` and `interactive` parts currently render the raw `artifact` JSON inside a `<details>` element. Replace the `ArtifactBlock` component in `components/MessageList.tsx` with your domain-specific renderer once the artifact shape is known.
+`ui` and `interactive` parts are restored from persisted history through the same reducer used for
+live stream events. `ArtifactRenderer` renders Plotly charts and structured tables, including
+responsive overflow controls for narrow viewports.
 
-### Thread management
-Each `useChat` hook instance generates a stable `thread_id` (random string) on mount. Calling `reset()` clears messages and generates a new `thread_id`, starting a fresh conversation without reloading the page.
+### Conversation and run management
+HomeAI creates each conversation UUID and uses it as the LangGraph `thread_id`. `useChat` keeps
+separate message caches and stream controllers by conversation, so selecting another conversation
+does not abort an active producer. Conversation list/history endpoints restore persisted status and
+rendered output after reload. The stream response exposes `X-Run-ID`; Stop sends the owner-scoped
+run request, waits for interruption to settle, and retains already-persisted partial output.
+
+The model selector belongs to the composer, not stored conversation metadata. HomeChat sends the
+current model explicitly with every run and does not change the selection when switching
+conversations.

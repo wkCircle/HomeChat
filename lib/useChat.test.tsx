@@ -46,6 +46,48 @@ function initializeResponses(history: ConversationHistory) {
 }
 
 describe('useChat stop behavior', () => {
+  it('restores persisted chart and table artifacts from conversation history', async () => {
+    const chart = {
+      type: 'graph', renderer: 'plotly', format: 'json',
+      data: { props: { figure: { data: [{ type: 'bar', x: ['A'], y: [3] }] } } },
+    };
+    const table = {
+      type: 'table',
+      data: { title: 'Stored table', columns: ['name', 'value'], rows: [{ name: 'A', value: 3 }] },
+    };
+    initializeResponses({
+      conversation,
+      messages: [{
+        id: 'assistant-1',
+        role: 'assistant',
+        ordinal: 0,
+        status: 'completed',
+        parts: [
+          {
+            id: 'chart-part', position: 0, type: 'ui', payload: { artifact: chart },
+            created_at: '2026-09-04T00:00:00Z',
+          },
+          {
+            id: 'table-part', position: 1, type: 'ui', payload: { artifact: table },
+            created_at: '2026-09-04T00:00:01Z',
+          },
+        ],
+        created_at: '2026-09-04T00:00:00Z',
+        updated_at: '2026-09-04T00:00:01Z',
+      }],
+      truncated: false,
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await waitFor(() => expect(result.current.isInitializing).toBe(false));
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    expect(result.current.messages[0].parts).toEqual([
+      { type: 'ui', artifact: chart },
+      { type: 'ui', artifact: table },
+    ]);
+  });
+
   it('waits for a newly submitted stream run ID before stopping it', async () => {
     const history: ConversationHistory = { conversation, messages: [], truncated: false };
     const streamResponse = deferred<Response>();

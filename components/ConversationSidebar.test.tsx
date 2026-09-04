@@ -1,4 +1,4 @@
-import { render, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ConversationSummary } from '@/lib/types';
@@ -15,6 +15,64 @@ const conversation: ConversationSummary = {
 };
 
 describe('ConversationSidebar', () => {
+  it('opens as a focused mobile drawer and closes from its overlay or Escape', () => {
+    const onMobileClose = vi.fn();
+    const view = render(
+      <ConversationSidebar
+        conversations={[conversation]}
+        selectedConversationId={conversation.id}
+        streamingByConversation={{}}
+        collapsed={false}
+        mobileOpen
+        hasMore={false}
+        isLoadingMore={false}
+        onCreate={vi.fn()}
+        onSelect={vi.fn()}
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
+        onStop={vi.fn()}
+        onLoadMore={vi.fn()}
+        onCollapsedChange={vi.fn()}
+        onMobileClose={onMobileClose}
+      />,
+    );
+
+    expect(within(view.container).getByTitle('New conversation')).toHaveFocus();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onMobileClose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Close conversation sidebar' }));
+    expect(onMobileClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('exposes desktop collapse without collapsing the mobile drawer width', async () => {
+    const user = userEvent.setup();
+    const onCollapsedChange = vi.fn();
+    const view = render(
+      <ConversationSidebar
+        conversations={[conversation]}
+        selectedConversationId={conversation.id}
+        streamingByConversation={{}}
+        collapsed
+        mobileOpen={false}
+        hasMore={false}
+        isLoadingMore={false}
+        onCreate={vi.fn()}
+        onSelect={vi.fn()}
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
+        onStop={vi.fn()}
+        onLoadMore={vi.fn()}
+        onCollapsedChange={onCollapsedChange}
+        onMobileClose={vi.fn()}
+      />,
+    );
+
+    const sidebar = within(view.container).getByRole('complementary', { name: 'Conversation history' });
+    expect(sidebar).toHaveClass('w-72', 'md:w-16', '-translate-x-full', 'md:translate-x-0');
+    await user.click(within(view.container).getByRole('button', { name: 'Expand sidebar' }));
+    expect(onCollapsedChange).toHaveBeenCalledWith(false);
+  });
+
   it('shows compact conversation activity beside the title', () => {
     const view = render(
       <ConversationSidebar
