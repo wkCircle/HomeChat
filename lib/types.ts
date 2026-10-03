@@ -1,7 +1,7 @@
 // ─── Stream event types (mirrors source/lib/fastapi/schema.py StreamTypeEnum) ─
 
 /** Sole product default; backend requests must always include the selected model. */
-export const DEFAULT_MODEL = 'gpt-5.1';
+export const DEFAULT_MODEL = 'gpt-5.6-luna';
 
 /**
  * String-keyed constant object — the TypeScript equivalent of Python's StrEnum.
