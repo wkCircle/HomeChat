@@ -127,7 +127,7 @@ The frontend consumes the `/api/chat/stream` endpoint (POST), which returns an *
 ```json
 {
   "message": "your question",
-  "model": "gpt-5.6-luna",
+  "model": "gpt-6-luna",
   "thread_id": "<uuid>",
   "kwargs": {
     "return_reasoning_info": true,

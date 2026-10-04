@@ -34,7 +34,8 @@ function deferred<T>() {
 
 function initializeResponses(history: ConversationHistory) {
   apiFetchMock.mockImplementation((path: string) => {
-    if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-5.6-luna'] }));
+    if (path === '/api/chat/conversations/conversation-1/usage') return Promise.resolve(jsonResponse({ conversation_id: 'conversation-1', invocations: 0, input_tokens: 0, cached_input_tokens: 0, cache_write_tokens: 0, output_tokens: 0, total_tokens: 0, estimated_cost_usd: null, latest_input_tokens: 0, latest_model: null }));
+    if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-6-luna'], context_windows: { 'gpt-6-luna': 1_050_000 }, pricing: { 'gpt-6-luna': null } }));
     if (path === '/api/chat/conversations?limit=20') {
       const page: ConversationPage = { conversations: [history.conversation], next_cursor: null };
       return Promise.resolve(jsonResponse(page));
@@ -51,7 +52,8 @@ describe('useChat stop behavior', () => {
     const generatedConversation = { ...conversation, title: 'Annual Home Maintenance Plan' };
     let historyRequests = 0;
     apiFetchMock.mockImplementation((path: string, options?: RequestInit) => {
-      if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-5.6-luna'] }));
+      if (path === '/api/chat/conversations/conversation-1/usage') return Promise.resolve(jsonResponse({ conversation_id: 'conversation-1', invocations: 0, input_tokens: 0, cached_input_tokens: 0, cache_write_tokens: 0, output_tokens: 0, total_tokens: 0, estimated_cost_usd: null, latest_input_tokens: 0, latest_model: null }));
+    if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-6-luna'], context_windows: { 'gpt-6-luna': 1_050_000 }, pricing: { 'gpt-6-luna': null } }));
       if (path === '/api/chat/conversations?limit=20') {
         return Promise.resolve(jsonResponse({ conversations: [conversation], next_cursor: null }));
       }
@@ -149,7 +151,8 @@ describe('useChat stop behavior', () => {
           run_id: 'run-1', status: 'interrupted', cancel_requested: true,
         }));
       }
-      if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-5.6-luna'] }));
+      if (path === '/api/chat/conversations/conversation-1/usage') return Promise.resolve(jsonResponse({ conversation_id: 'conversation-1', invocations: 0, input_tokens: 0, cached_input_tokens: 0, cache_write_tokens: 0, output_tokens: 0, total_tokens: 0, estimated_cost_usd: null, latest_input_tokens: 0, latest_model: null }));
+    if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-6-luna'], context_windows: { 'gpt-6-luna': 1_050_000 }, pricing: { 'gpt-6-luna': null } }));
       if (path === '/api/chat/conversations?limit=20') {
         return Promise.resolve(jsonResponse({ conversations: [conversation], next_cursor: null }));
       }
@@ -194,7 +197,8 @@ describe('useChat stop behavior', () => {
     };
     const lateHistory = deferred<Response>();
     apiFetchMock.mockImplementation((path: string) => {
-      if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-5.6-luna'] }));
+      if (path === '/api/chat/conversations/conversation-1/usage') return Promise.resolve(jsonResponse({ conversation_id: 'conversation-1', invocations: 0, input_tokens: 0, cached_input_tokens: 0, cache_write_tokens: 0, output_tokens: 0, total_tokens: 0, estimated_cost_usd: null, latest_input_tokens: 0, latest_model: null }));
+    if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-6-luna'], context_windows: { 'gpt-6-luna': 1_050_000 }, pricing: { 'gpt-6-luna': null } }));
       if (path === '/api/chat/conversations?limit=20') {
         return Promise.resolve(jsonResponse({
           conversations: [runningConversation], next_cursor: null,
@@ -241,7 +245,8 @@ describe('useChat stop behavior', () => {
     };
     let historyRequests = 0;
     apiFetchMock.mockImplementation((path: string) => {
-      if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-5.6-luna'] }));
+      if (path === '/api/chat/conversations/conversation-1/usage') return Promise.resolve(jsonResponse({ conversation_id: 'conversation-1', invocations: 0, input_tokens: 0, cached_input_tokens: 0, cache_write_tokens: 0, output_tokens: 0, total_tokens: 0, estimated_cost_usd: null, latest_input_tokens: 0, latest_model: null }));
+    if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-6-luna'], context_windows: { 'gpt-6-luna': 1_050_000 }, pricing: { 'gpt-6-luna': null } }));
       if (path === '/api/chat/conversations?limit=20') {
         return Promise.resolve(jsonResponse({
           conversations: [runningConversation], next_cursor: null,

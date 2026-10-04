@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ConversationSidebar } from '@/components/ConversationSidebar';
+import { ConversationUsageButton } from '@/components/ConversationUsage';
 import { MessageList } from '@/components/MessageList';
 import { ModelSelector } from '@/components/ModelSelector';
 import { SettingsPanel } from '@/components/SettingsPanel';
@@ -229,9 +230,12 @@ export default function ChatPage() {
             <div className="flex items-center justify-end gap-1">
               <ModelSelector
                 models={chat.models}
+                contextWindows={chat.contextWindows}
+                pricing={chat.modelPricing}
                 selectedModel={selectedModel}
                 onSelect={setSelectedModel}
               />
+              <ConversationUsageButton usage={chat.selectedConversationUsage} contextWindowTokens={chat.contextWindows[selectedModel]} />
               {chat.isLoading && chat.selectedConversationId ? (
                 <button
                   type="button"

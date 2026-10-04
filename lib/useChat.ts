@@ -10,6 +10,8 @@ import type {
   ConversationHistory,
   ConversationPage,
   ConversationSummary,
+  ConversationUsage,
+  ModelPricing,
   MessagePart,
   ModelsResponse,
   RunStatusResponse,
@@ -68,6 +70,9 @@ export function useChat({
     Record<string, string | null>
   >({});
   const [models, setModels] = useState<string[]>([DEFAULT_MODEL]);
+  const [contextWindows, setContextWindows] = useState<Record<string, number>>({});
+  const [modelPricing, setModelPricing] = useState<Record<string, ModelPricing | null>>({});
+  const [usageByConversation, setUsageByConversation] = useState<Record<string, ConversationUsage>>({});
   const [isInitializing, setIsInitializing] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const historyRequests = useRef(new Set<string>());
@@ -97,6 +102,13 @@ export function useChat({
     ),
   );
 
+  const loadUsage = useCallback(async (conversationId: string) => {
+    const response = await apiFetch(`/api/chat/conversations/${conversationId}/usage`);
+    if (!response.ok) return;
+    const usage = (await response.json()) as ConversationUsage;
+    setUsageByConversation((current) => ({ ...current, [conversationId]: usage }));
+  }, []);
+
   const loadHistory = useCallback(async (conversationId: string) => {
     if (historyRequests.current.has(conversationId)) return;
     historyRequests.current.add(conversationId);
@@ -117,13 +129,14 @@ export function useChat({
         [conversationId]: history.messages.map(storedMessageToChatMessage),
       }));
       setConversations((current) => mergeConversations(current, [conversation]));
+      void loadUsage(conversationId);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       setErrorsByConversation((current) => ({ ...current, [conversationId]: message }));
     } finally {
       historyRequests.current.delete(conversationId);
     }
-  }, []);
+  }, [loadUsage]);
 
   useEffect(() => {
     let active = true;
@@ -137,6 +150,8 @@ export function useChat({
       if (modelsResult.status === 'fulfilled' && modelsResult.value.ok) {
         const data = (await modelsResult.value.json()) as ModelsResponse;
         if (data.models.length > 0) setModels(data.models);
+        setContextWindows(data.context_windows);
+        setModelPricing(data.pricing);
       }
 
       if (conversationsResult.status === 'fulfilled' && conversationsResult.value.ok) {
@@ -383,7 +398,7 @@ export function useChat({
             message.id === assistantId ? { ...message, status: finalStatus } : message,
           ),
         }));
-        if (finalStatus === 'completed') await loadHistory(conversationId);
+        if (finalStatus === 'completed') { await loadHistory(conversationId); await loadUsage(conversationId); }
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
@@ -474,12 +489,15 @@ export function useChat({
     selectedConversationId,
     messages,
     models,
+    contextWindows,
+    modelPricing,
     isLoading,
     isInitializing,
     isLoadingMore,
     hasMoreConversations: nextCursor !== null,
     error,
     streamingByConversation,
+    selectedConversationUsage: selectedConversationId ? usageByConversation[selectedConversationId] ?? null : null,
     append,
     createConversation,
     selectConversation,

@@ -1,7 +1,7 @@
 // ─── Stream event types (mirrors source/lib/fastapi/schema.py StreamTypeEnum) ─
 
 /** Sole product default; backend requests must always include the selected model. */
-export const DEFAULT_MODEL = 'gpt-5.6-luna';
+export const DEFAULT_MODEL = 'gpt-6-luna';
 
 /**
  * String-keyed constant object — the TypeScript equivalent of Python's StrEnum.
@@ -82,8 +82,24 @@ export interface RunStatusResponse {
   cancel_requested: boolean;
 }
 
+export interface ModelPricing {
+  currency: string;
+  pricing_unit_tokens: number;
+  long_context_threshold: number;
+  input_price: number;
+  cached_input_price: number;
+  cache_write_price: number | null;
+  output_price: number;
+  long_input_price: number;
+  long_cached_input_price: number;
+  long_cache_write_price: number | null;
+  long_output_price: number;
+}
+
 export interface ModelsResponse {
   models: string[];
+  context_windows: Record<string, number>;
+  pricing: Record<string, ModelPricing | null>;
 }
 
 export interface ConversationSummary {
@@ -118,6 +134,10 @@ export interface StoredMessage {
   parts: StoredMessagePart[];
   created_at: string;
   updated_at: string;
+}
+
+export interface ConversationUsage {
+  conversation_id: string; invocations: number; input_tokens: number; cached_input_tokens: number; cache_write_tokens: number; output_tokens: number; total_tokens: number; estimated_cost_usd: number | null; latest_input_tokens: number; latest_model: string | null;
 }
 
 export interface ConversationHistory {
