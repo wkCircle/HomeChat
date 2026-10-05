@@ -3,6 +3,8 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import type { ModelPricing } from "@/lib/types";
 
+const LONG_PRESS_DURATION_MS = 500;
+
 interface ModelSelectorProps {
   models: string[];
   selectedModel: string;
@@ -120,6 +122,19 @@ export function ModelSelector({
   const [open, setOpen] = useState(false);
   const [hoveredModel, setHoveredModel] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTriggeredRef = useRef(false);
+  const touchFocusRef = useRef(false);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  useEffect(() => clearLongPressTimer, []);
+
   useEffect(() => {
     if (!open) return;
     const close = (event: MouseEvent | KeyboardEvent) => {
@@ -152,16 +167,47 @@ export function ModelSelector({
               <div
                 key={model}
                 className="relative"
-                onMouseEnter={() => setHoveredModel(model)}
-                onMouseLeave={() => setHoveredModel(null)}
+                onPointerEnter={(event) => {
+                  if (event.pointerType === "mouse") setHoveredModel(model);
+                }}
+                onPointerLeave={(event) => {
+                  if (event.pointerType === "mouse") setHoveredModel(null);
+                }}
               >
                 <button
                   type="button"
                   role="option"
                   aria-selected={selected}
-                  onFocus={() => setHoveredModel(model)}
+                  onFocus={() => {
+                    if (!touchFocusRef.current) setHoveredModel(model);
+                  }}
                   onBlur={() => setHoveredModel(null)}
-                  onClick={() => {
+                  onPointerDown={(event) => {
+                    touchFocusRef.current = event.pointerType === "touch";
+                    if (event.pointerType !== "touch") return;
+
+                    clearLongPressTimer();
+                    longPressTriggeredRef.current = false;
+                    setHoveredModel(null);
+                    longPressTimerRef.current = setTimeout(() => {
+                      longPressTriggeredRef.current = true;
+                      setHoveredModel(model);
+                    }, LONG_PRESS_DURATION_MS);
+                  }}
+                  onPointerUp={clearLongPressTimer}
+                  onPointerCancel={clearLongPressTimer}
+                  onPointerLeave={(event) => {
+                    if (event.pointerType === "touch") clearLongPressTimer();
+                  }}
+                  onContextMenu={(event) => {
+                    if (touchFocusRef.current) event.preventDefault();
+                  }}
+                  onClick={(event) => {
+                    if (longPressTriggeredRef.current) {
+                      event.preventDefault();
+                      longPressTriggeredRef.current = false;
+                      return;
+                    }
                     onSelect(model);
                     setOpen(false);
                   }}
