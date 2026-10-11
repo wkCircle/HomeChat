@@ -140,6 +140,52 @@ describe('useChat stop behavior', () => {
     ]);
   });
 
+  it('handles split and multiple compaction NDJSON events without adding transcript parts', async () => {
+    let historyRequests = 0;
+    apiFetchMock.mockImplementation((path: string) => {
+      if (path === '/api/chat/conversations/conversation-1/usage') return Promise.resolve(jsonResponse({ conversation_id: 'conversation-1', invocations: 0, input_tokens: 0, cached_input_tokens: 0, cache_write_tokens: 0, output_tokens: 0, total_tokens: 0, estimated_cost_usd: null, latest_input_tokens: 0, latest_model: null }));
+      if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: ['gpt-6-luna'], context_windows: { 'gpt-6-luna': 1_050_000 }, pricing: { 'gpt-6-luna': null } }));
+      if (path === '/api/chat/conversations?limit=20') return Promise.resolve(jsonResponse({ conversations: [conversation], next_cursor: null }));
+      if (path === '/api/chat/conversations/conversation-1/messages') {
+        historyRequests += 1;
+        return Promise.resolve(jsonResponse(historyRequests === 1
+          ? { conversation, messages: [], truncated: false }
+          : {
+            conversation,
+            messages: [{
+              id: 'assistant-1', role: 'assistant', ordinal: 1, status: 'completed',
+              parts: [{ id: 'part-1', position: 0, type: 'text', payload: { text: 'Done' }, created_at: '2026-09-04T00:00:00Z' }],
+              created_at: '2026-09-04T00:00:00Z', updated_at: '2026-09-04T00:00:00Z',
+            }],
+            truncated: false,
+          }));
+      }
+      if (path === '/api/chat/stream') {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode('{"type":"comp'));
+            controller.enqueue(encoder.encode('acting","content":{"active":true},"metadata":{}}\n{"type":"text","content":{"text":"Done"},"metadata":{}}\n{"type":"compacting","content":{"active":false},"metadata":{}}\n'));
+            controller.close();
+          },
+        });
+        return Promise.resolve(new Response(stream, { headers: { 'X-Run-ID': 'run-1' } }));
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    const { result } = renderHook(() => useChat());
+    await waitFor(() => expect(result.current.isInitializing).toBe(false));
+
+    await act(async () => {
+      await result.current.append('Compact this conversation');
+    });
+
+    expect(result.current.isCompacting).toBe(false);
+    expect(result.current.messages).toHaveLength(1);
+    expect(result.current.messages[0].parts).toEqual([{ type: 'text', text: 'Done' }]);
+  });
+
   it('waits for a newly submitted stream run ID before stopping it', async () => {
     const history: ConversationHistory = { conversation, messages: [], truncated: false };
     const streamResponse = deferred<Response>();

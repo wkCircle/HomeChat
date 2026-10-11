@@ -190,6 +190,11 @@ export default function ChatPage() {
             ) : (
               <MessageList messages={chat.messages} isLoading={chat.isLoading} />
             )}
+            {chat.isCompacting && (
+              <p role="status" className="mt-3 text-center text-sm text-gray-400">
+                Compacting the conversation history...
+              </p>
+            )}
             {(chat.error || actionError) && (
               <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
                 {chat.error ?? actionError}
