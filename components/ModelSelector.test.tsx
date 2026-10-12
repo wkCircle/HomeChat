@@ -51,4 +51,27 @@ describe("ModelSelector touch interactions", () => {
     expect(onSelect).not.toHaveBeenCalled();
     expect(screen.getByRole("listbox")).toBeInTheDocument();
   });
+
+  it("dismisses long-press details before dismissing the model list", () => {
+    vi.useFakeTimers();
+    renderSelector();
+    const option = screen.getByRole("option", { name: "claude-sonnet" });
+
+    fireEvent.pointerDown(option, { pointerType: "touch" });
+    act(() => vi.advanceTimersByTime(500));
+    fireEvent.pointerUp(option, { pointerType: "touch" });
+
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Select model, currently gpt-5" }),
+    );
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
 });

@@ -138,13 +138,17 @@ export function ModelSelector({
   useEffect(() => {
     if (!open) return;
     const close = (event: MouseEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent && event.key === "Escape")
+      if (event instanceof KeyboardEvent && event.key === "Escape") {
+        setHoveredModel(null);
         setOpen(false);
+      }
       if (
         event instanceof MouseEvent &&
         !containerRef.current?.contains(event.target as Node)
-      )
-        setOpen(false);
+      ) {
+        if (hoveredModel !== null) setHoveredModel(null);
+        else setOpen(false);
+      }
     };
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", close);
@@ -152,7 +156,7 @@ export function ModelSelector({
       document.removeEventListener("mousedown", close);
       document.removeEventListener("keydown", close);
     };
-  }, [open]);
+  }, [hoveredModel, open]);
   return (
     <div ref={containerRef} className="relative shrink-0">
       {open && (
@@ -209,6 +213,7 @@ export function ModelSelector({
                       return;
                     }
                     onSelect(model);
+                    setHoveredModel(null);
                     setOpen(false);
                   }}
                   className={`flex h-10 w-full items-center gap-2 rounded-md px-3 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
@@ -244,7 +249,10 @@ export function ModelSelector({
         aria-expanded={open}
         aria-label={`Select model, currently ${selectedModel}`}
         title="Select model"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          setHoveredModel(null);
+          setOpen((current) => !current);
+        }}
         className="flex h-10 max-w-36 items-center gap-2 rounded-lg px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-200 dark:hover:bg-gray-600"
       >
         <ModelIcon model={selectedModel} />
