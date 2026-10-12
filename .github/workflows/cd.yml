@@ -64,3 +64,18 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ghcr.io/${{ env.IMAGE_OWNER }}/home_chat:latest
+
+      - name: Trigger HomeAI deployment
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.app == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.HOMEAI_DISPATCH_TOKEN }}
+          HOMEAI_REPOSITORY: ${{ github.repository_owner }}/HomeAI
+        shell: bash
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "HOMEAI_DISPATCH_TOKEN is not configured."
+            exit 1
+          fi
+          gh api --method POST "repos/${HOMEAI_REPOSITORY}/dispatches" \
+            --field event_type=homechat-image-published \
+            --field "client_payload[sha]=${GITHUB_SHA}"
