@@ -1,11 +1,20 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ConversationHistory, ConversationPage, ConversationSummary } from './types';
 import { useChat } from './useChat';
 
 const apiFetchMock = vi.hoisted(() => vi.fn());
 
 vi.mock('./api', () => ({ default: apiFetchMock }));
+
+beforeEach(() => {
+  window.history.replaceState(null, '', '/chatbot');
+  apiFetchMock.mockReset();
+});
+
+afterEach(() => {
+  window.history.replaceState(null, '', '/');
+});
 
 const conversation: ConversationSummary = {
   id: 'conversation-1',
@@ -46,6 +55,97 @@ function initializeResponses(history: ConversationHistory) {
     throw new Error(`Unexpected request: ${path}`);
   });
 }
+
+describe('useChat conversation URL', () => {
+  it('restores the URL conversation instead of the first sidebar conversation', async () => {
+    const bookmarked = { ...conversation, id: 'bookmarked-chat', title: 'Bookmarked chat' };
+    window.history.replaceState({ preserved: true }, '', '/chatbot?thread_id=bookmarked-chat&other=value#messages');
+    initializeResponses({ conversation, messages: [], truncated: false });
+    const defaultImplementation = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path: string) => {
+      if (path === '/api/chat/conversations/bookmarked-chat/messages') {
+        return Promise.resolve(jsonResponse({ conversation: bookmarked, messages: [], truncated: false }));
+      }
+      if (path === '/api/chat/conversations/bookmarked-chat/usage') {
+        return Promise.resolve(new Response(null, { status: 404 }));
+      }
+      return defaultImplementation(path);
+    });
+
+    const { result, unmount } = renderHook(() => useChat());
+    await waitFor(() => expect(result.current.selectedConversation?.title).toBe('Bookmarked chat'));
+    expect(result.current.selectedConversationId).toBe(bookmarked.id);
+    expect(result.current.conversations).toContainEqual(bookmarked);
+    expect(apiFetchMock).not.toHaveBeenCalledWith('/api/chat/conversations/conversation-1/messages');
+    expect(window.location.search).toBe('?thread_id=bookmarked-chat&other=value');
+    expect(window.location.hash).toBe('#messages');
+    expect(window.history.state).toEqual({ preserved: true });
+
+    unmount();
+    const reloaded = renderHook(() => useChat());
+    await waitFor(() => expect(reloaded.result.current.selectedConversation?.id).toBe(bookmarked.id));
+  });
+
+  it('updates the URL when selecting a chat and restores that selection on remount', async () => {
+    const second = { ...conversation, id: 'conversation-2' };
+    initializeResponses({ conversation, messages: [], truncated: false });
+    const defaultImplementation = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path: string) => {
+      if (path === '/api/chat/conversations/conversation-2/messages') {
+        return Promise.resolve(jsonResponse({ conversation: second, messages: [], truncated: false }));
+      }
+      if (path === '/api/chat/conversations/conversation-2/usage') {
+        return Promise.resolve(new Response(null, { status: 404 }));
+      }
+      return defaultImplementation(path);
+    });
+    const { result, unmount } = renderHook(() => useChat());
+    await waitFor(() => expect(result.current.isInitializing).toBe(false));
+    expect(window.location.search).toBe('?thread_id=conversation-1');
+
+    act(() => result.current.selectConversation(second.id));
+    await waitFor(() => expect(result.current.selectedConversation?.id).toBe(second.id));
+    expect(window.location.search).toBe('?thread_id=conversation-2');
+
+    unmount();
+    const reloaded = renderHook(() => useChat());
+    await waitFor(() => expect(reloaded.result.current.selectedConversation?.id).toBe(second.id));
+  });
+
+  it('updates the URL for a newly created chat and clears it when the last chat is deleted', async () => {
+    apiFetchMock.mockImplementation((path: string, options?: RequestInit) => {
+      if (path === '/api/chat/models') return Promise.resolve(jsonResponse({ models: [], context_windows: {}, pricing: {} }));
+      if (path === '/api/chat/conversations?limit=20') return Promise.resolve(jsonResponse({ conversations: [], next_cursor: null }));
+      if (path === '/api/chat/conversations' && options?.method === 'POST') return Promise.resolve(jsonResponse(conversation));
+      if (path === '/api/chat/conversations/conversation-1' && options?.method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }));
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    window.history.replaceState(null, '', '/chatbot?other=value');
+    const { result } = renderHook(() => useChat());
+    await waitFor(() => expect(result.current.isInitializing).toBe(false));
+    await act(async () => { await result.current.createConversation(); });
+    expect(new URL(window.location.href).searchParams.get('thread_id')).toBe(conversation.id);
+    await act(async () => { await result.current.deleteConversation(conversation.id); });
+    expect(result.current.selectedConversationId).toBeNull();
+    expect(window.location.search).toBe('?other=value');
+  });
+
+  it('keeps an unavailable bookmarked chat selected and displays the history error', async () => {
+    window.history.replaceState(null, '', '/chatbot?thread_id=missing-chat');
+    initializeResponses({ conversation, messages: [], truncated: false });
+    const defaultImplementation = apiFetchMock.getMockImplementation()!;
+    apiFetchMock.mockImplementation((path: string) => {
+      if (path === '/api/chat/conversations/missing-chat/messages') {
+        return Promise.resolve(new Response(JSON.stringify({ detail: 'Conversation not found' }), { status: 404 }));
+      }
+      return defaultImplementation(path);
+    });
+    const { result } = renderHook(() => useChat());
+    await waitFor(() => expect(result.current.error).toBe('Conversation not found'));
+    expect(result.current.selectedConversationId).toBe('missing-chat');
+    expect(window.location.search).toBe('?thread_id=missing-chat');
+  });
+});
 
 describe('useChat stop behavior', () => {
   it('loads the AI-generated title after the first stream without renaming locally', async () => {

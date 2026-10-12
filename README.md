@@ -168,6 +168,14 @@ history so HomeAI's AI-generated title replaces the temporary `New chat` label. 
 exposes `X-Run-ID`; Stop sends the owner-scoped run request, waits for interruption to settle, and
 retains already-persisted partial output.
 
+The selected conversation is reflected in the URL as `/chatbot?thread_id=<uuid>`. Refreshing or
+opening a bookmark restores that conversation, even when it is outside the first sidebar page.
+Selecting or creating a chat updates the URL without reloading or adding browser history entries;
+deleting the selected chat updates it to the next selection (or removes `thread_id` if none remain).
+Without a `thread_id`, the first sidebar conversation is selected as before. Unavailable or
+unauthorized bookmarked conversations display the backend's history error rather than silently
+opening a different chat. Access is still enforced by the backend; the URL is not authorization.
+
 The model selector belongs to the composer, not stored conversation metadata. HomeChat sends the
 current model explicitly with every run and does not change the selection when switching
 conversations.

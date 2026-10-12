@@ -103,7 +103,7 @@ export function useChat({
   );
 
   const loadUsage = useCallback(async (conversationId: string) => {
-    const response = await apiFetch(`/api/chat/conversations/${conversationId}/usage`);
+    const response = await apiFetch(`/api/chat/conversations/${encodeURIComponent(conversationId)}/usage`);
     if (!response.ok) return;
     const usage = (await response.json()) as ConversationUsage;
     setUsageByConversation((current) => ({ ...current, [conversationId]: usage }));
@@ -113,7 +113,7 @@ export function useChat({
     if (historyRequests.current.has(conversationId)) return;
     historyRequests.current.add(conversationId);
     try {
-      const response = await apiFetch(`/api/chat/conversations/${conversationId}/messages`);
+      const response = await apiFetch(`/api/chat/conversations/${encodeURIComponent(conversationId)}/messages`);
       if (!response.ok) {
         throw await responseError(response, `Unable to load conversation (${response.status})`);
       }
@@ -140,6 +140,7 @@ export function useChat({
 
   useEffect(() => {
     let active = true;
+    const requestedConversationId = new URL(window.location.href).searchParams.get('thread_id');
     async function initialize() {
       const [modelsResult, conversationsResult] = await Promise.allSettled([
         apiFetch('/api/chat/models'),
@@ -154,16 +155,19 @@ export function useChat({
         setModelPricing(data.pricing);
       }
 
+      let firstId: string | null = null;
       if (conversationsResult.status === 'fulfilled' && conversationsResult.value.ok) {
         const page = (await conversationsResult.value.json()) as ConversationPage;
         const conversations = summariesWithCurrentRunStatus(page.conversations);
         synchronizeActiveRunIds(conversations);
         setConversations(mergeConversations([], conversations));
         setNextCursor(page.next_cursor);
-        const firstId = conversations[0]?.id ?? null;
-        setSelectedConversationId(firstId);
-        if (firstId) void loadHistory(firstId);
+        firstId = conversations[0]?.id ?? null;
       }
+      // History can restore a bookmarked conversation outside the first sidebar page.
+      const initialId = requestedConversationId || firstId;
+      setSelectedConversationId(initialId);
+      if (initialId) void loadHistory(initialId);
       setIsInitializing(false);
     }
     void initialize();
@@ -171,6 +175,20 @@ export function useChat({
       active = false;
     };
   }, [loadHistory]);
+
+  useEffect(() => {
+    // Do not clear the incoming thread_id before initialization has restored it.
+    if (isInitializing) return;
+    const url = new URL(window.location.href);
+    if (selectedConversationId) {
+      url.searchParams.set('thread_id', selectedConversationId);
+    } else {
+      url.searchParams.delete('thread_id');
+    }
+    if (url.href !== window.location.href) {
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, [isInitializing, selectedConversationId]);
 
   useEffect(() => {
     const runningConversationIds = conversations
