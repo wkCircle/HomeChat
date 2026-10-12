@@ -70,6 +70,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.HOMEAI_DISPATCH_TOKEN }}
           HOMEAI_REPOSITORY: ${{ github.repository_owner }}/HomeAI
+          CORRELATION_ID: ${{ github.run_id }}-${{ github.run_attempt }}
         shell: bash
         run: |
           if [[ -z "$GH_TOKEN" ]]; then
@@ -78,4 +79,38 @@ jobs:
           fi
           gh api --method POST "repos/${HOMEAI_REPOSITORY}/dispatches" \
             --field event_type=homechat-image-published \
-            --field "client_payload[sha]=${GITHUB_SHA}"
+            --field "client_payload[sha]=${GITHUB_SHA}" \
+            --field "client_payload[correlation_id]=${CORRELATION_ID}"
+
+      - name: Wait for HomeAI deployment
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.app == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.HOMEAI_DISPATCH_TOKEN }}
+          HOMEAI_REPOSITORY: ${{ github.repository_owner }}/HomeAI
+          RUN_TITLE: HomeChat deployment ${{ github.run_id }}-${{ github.run_attempt }}
+        shell: bash
+        run: |
+          RUN_ID=""
+          for attempt in {1..60}; do
+            RUN_ID=$(gh run list \
+              --repo "$HOMEAI_REPOSITORY" \
+              --workflow cd.yml \
+              --event repository_dispatch \
+              --limit 50 \
+              --json databaseId,displayTitle \
+              --jq ".[] | select(.displayTitle == \"$RUN_TITLE\") | .databaseId" \
+              | head -n 1)
+            if [[ -n "$RUN_ID" ]]; then
+              break
+            fi
+            echo "Waiting for the HomeAI deployment run to appear (attempt $attempt/60)..."
+            sleep 5
+          done
+
+          if [[ -z "$RUN_ID" ]]; then
+            echo "Could not find HomeAI workflow run: $RUN_TITLE"
+            exit 1
+          fi
+
+          echo "Watching HomeAI workflow run $RUN_ID"
+          gh run watch "$RUN_ID" --repo "$HOMEAI_REPOSITORY" --exit-status
