@@ -130,7 +130,7 @@ function MonitorBlock({ part }: { part: MonitorPart }) {
 
 // ─── Single message ───────────────────────────────────────────────────────────
 
-function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage; isLoading?: boolean; onAvatarClick?: () => void }) {
+function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick }: { msg: ChatMessage; isLoading?: boolean; isCompacting?: boolean; onAvatarClick?: () => void }) {
   // Build set of tool_call_ids that have a matching func_call_end part
   const resolvedIds = new Set(
     msg.parts
@@ -192,7 +192,7 @@ function AssistantMessage({ msg, isLoading, onAvatarClick }: { msg: ChatMessage;
             <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.3s]" />
             <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.15s]" />
             <span className="inline-block h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400" />
-            <span className="text-gray-400">Working…</span>
+            <span className="text-gray-400">{isCompacting ? 'Compacting the conversation history…' : 'Working…'}</span>
           </span>
         )}
         {msg.status === 'interrupted' && !isLoading && (
@@ -223,7 +223,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 
-export function MessageList({ messages, isLoading }: { messages: ChatMessage[]; isLoading?: boolean }) {
+export function MessageList({ messages, isLoading, isCompacting }: { messages: ChatMessage[]; isLoading?: boolean; isCompacting?: boolean }) {
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   return (
     <div className="space-y-4">
@@ -236,6 +236,7 @@ export function MessageList({ messages, isLoading }: { messages: ChatMessage[]; 
             key={msg.id}
             msg={msg}
             isLoading={isLastMsg ? isLoading : false}
+            isCompacting={isLastMsg ? isCompacting : false}
             onAvatarClick={() => setIsAvatarOpen(true)}
           />
         );

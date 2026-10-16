@@ -15,6 +15,7 @@ export const StreamTypeEnum = {
   UI: 'ui',
   INTERACTIVE: 'interactive',
   MONITOR: 'monitor',
+  COMPACTING: 'compacting',
   ERROR: 'error',
 } as const;
 

@@ -66,6 +66,9 @@ export function useChat({
   const [streamingByConversation, setStreamingByConversation] = useState<
     Record<string, boolean>
   >({});
+  const [compactingByConversation, setCompactingByConversation] = useState<
+    Record<string, boolean>
+  >({});
   const [errorsByConversation, setErrorsByConversation] = useState<
     Record<string, string | null>
   >({});
@@ -403,10 +406,24 @@ export function useChat({
           const { done, value } = await reader.read();
           if (done) break;
           for (const event of parser.push(value)) {
+            if (event.type === StreamTypeEnum.COMPACTING) {
+              setCompactingByConversation((current) => ({
+                ...current,
+                [conversationId]: event.content['active'] === true,
+              }));
+              continue;
+            }
             updateParts((parts) => routeEvent(parts, event));
           }
         }
         for (const event of parser.finish()) {
+          if (event.type === StreamTypeEnum.COMPACTING) {
+            setCompactingByConversation((current) => ({
+              ...current,
+              [conversationId]: event.content['active'] === true,
+            }));
+            continue;
+          }
           updateParts((parts) => routeEvent(parts, event));
         }
         const finalStatus = stoppedRunIds.current.has(runId) ? 'interrupted' : 'completed';
@@ -439,6 +456,7 @@ export function useChat({
           if (runId) stoppedRunIds.current.delete(runId);
           runIdsByConversation.current.delete(conversationId);
           setStreamingByConversation((current) => ({ ...current, [conversationId]: false }));
+          setCompactingByConversation((current) => ({ ...current, [conversationId]: false }));
         }
       }
     },
@@ -484,6 +502,7 @@ export function useChat({
     streamControllers.current.get(conversationId)?.abort();
     runIdsByConversation.current.delete(conversationId);
     setStreamingByConversation((current) => ({ ...current, [conversationId]: false }));
+    setCompactingByConversation((current) => ({ ...current, [conversationId]: false }));
     setConversations((current) => current.map((conversation) =>
       conversation.id === conversationId
         ? { ...conversation, run_status: result.status, active_run_id: null }
@@ -499,6 +518,9 @@ export function useChat({
   const isLoading = selectedConversationId
     ? Boolean(streamingByConversation[selectedConversationId])
     : false;
+  const isCompacting = selectedConversationId
+    ? Boolean(compactingByConversation[selectedConversationId])
+    : false;
   const error = selectedConversationId ? errorsByConversation[selectedConversationId] ?? null : null;
 
   return {
@@ -510,6 +532,7 @@ export function useChat({
     contextWindows,
     modelPricing,
     isLoading,
+    isCompacting,
     isInitializing,
     isLoadingMore,
     hasMoreConversations: nextCursor !== null,
