@@ -2,23 +2,12 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
-import { StreamTypeEnum } from '@/lib/types';
 
 // Plotly must run client-side; disable SSR
 // Explicit generic loosens prop typing so TS doesn't complain about Plot props
 const Plot = dynamic<any>(() => import('react-plotly.js'), { ssr: false, loading: () => (
   <div className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">Loading chart…</div>
 )});
-
-function isHttpUrl(url?: string): boolean {
-  if (!url) return false;
-  try {
-    const u = new URL(url);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
 
 function PlotlyGraph({ figure, style, responsive, config }: { figure: any; style?: Record<string, any>; responsive?: boolean; config?: any }) {
   const data = figure?.data ?? [];
@@ -58,10 +47,8 @@ function PlotlyGraph({ figure, style, responsive, config }: { figure: any; style
 
 export default function ArtifactRenderer({
   artifact,
-  kind,
 }: {
   artifact: Record<string, unknown>;
-  kind: typeof StreamTypeEnum.UI | typeof StreamTypeEnum.INTERACTIVE;
 }) {
   const type = (artifact?.['type'] as string) || '';
 
@@ -99,21 +86,15 @@ export default function ArtifactRenderer({
         }
         if (figure) return <PlotlyGraph figure={figure} responsive={responsive} config={configOverride} style={style} />;
       }
-      // html format
-      if (artifact['html'] && typeof artifact['html'] === 'string') {
+      if (
+        format !== 'json' ||
+        typeof artifact['html'] === 'string' ||
+        typeof artifact['url'] === 'string'
+      ) {
         return (
-          <div className="max-w-full overflow-auto rounded border border-blue-200" style={{ touchAction: 'pan-x pan-y' }}>
-            <div dangerouslySetInnerHTML={{ __html: artifact['html'] as string }} />
-          </div>
-        );
-      }
-      // url to hosted html
-      const url = artifact['url'] as string | undefined;
-      if (isHttpUrl(url)) {
-        return (
-          <div className="max-w-full overflow-hidden rounded border border-blue-200">
-            <iframe src={url} className="h-[420px] w-full max-w-full" />
-          </div>
+          <p role="alert" className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            HTML and hosted chart artifacts are not supported for security reasons. Generate a JSON chart instead.
+          </p>
         );
       }
       // Otherwise fallback to JSON
@@ -365,7 +346,7 @@ export default function ArtifactRenderer({
   return (
     <details className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-xs" open>
       <summary className="cursor-pointer font-medium text-blue-700 select-none">
-        {kind === StreamTypeEnum.INTERACTIVE ? '🖱 Interactive block' : '📊 UI block'}
+        📊 UI block
       </summary>
       <pre className="mt-1 max-h-60 overflow-auto whitespace-pre-wrap break-all text-blue-900">{JSON.stringify(artifact, null, 2)}</pre>
     </details>

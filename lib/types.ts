@@ -13,7 +13,6 @@ export const StreamTypeEnum = {
   FUNC_CALL_START: 'function_call_start',
   FUNC_CALL_END: 'function_call_end',
   UI: 'ui',
-  INTERACTIVE: 'interactive',
   MONITOR: 'monitor',
   COMPACTING: 'compacting',
   ERROR: 'error',
@@ -47,7 +46,6 @@ export type FuncCallEndPart = {
 };
 
 export type UIPart          = { type: typeof StreamTypeEnum.UI;          artifact: Record<string, unknown> };
-export type InteractivePart = { type: typeof StreamTypeEnum.INTERACTIVE; artifact: Record<string, unknown> };
 
 /** Token usage metadata from LangChain AIMessage.usage_metadata. */
 export type MonitorPart = { type: typeof StreamTypeEnum.MONITOR; usage: Record<string, unknown> };
@@ -59,7 +57,6 @@ export type MessagePart =
   | FuncCallStartPart
   | FuncCallEndPart
   | UIPart
-  | InteractivePart
   | MonitorPart
   | ErrorPart;
 

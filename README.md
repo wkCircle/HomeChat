@@ -118,7 +118,6 @@ The frontend consumes the `/api/chat/stream` endpoint (POST), which returns an *
 | `function_call_start` | Tool calls dispatched by the LLM | indexed dict of tool call objects |
 | `function_call_end` | Tool call result returned to the LLM | `tool_call_id`, `name`, `status`, `content` |
 | `ui` | Resolved UI artifact (e.g. chart, table) | `artifact` |
-| `interactive` | Resolved interactive artifact | `artifact` |
 | `monitor` | LLM token usage metadata | `input_tokens`, `output_tokens`, `total_tokens` |
 | `error` | Error emitted by the backend | error detail |
 
@@ -155,9 +154,14 @@ Consecutive `text` events are merged into a single `TextPart` in state rather th
 Each `ChatMessage` holds a `parts` array instead of a single string. This maps naturally to the multi-type stream — a single assistant turn can contain reasoning blocks, tool call steps, UI artifacts, and text, all rendered in order.
 
 ### Extensible artifact rendering
-`ui` and `interactive` parts are restored from persisted history through the same reducer used for
-live stream events. `ArtifactRenderer` renders Plotly charts and structured tables, including
-responsive overflow controls for narrow viewports.
+`ui` parts are restored from persisted history through the same reducer used for live stream
+events. `ArtifactRenderer` renders JSON Plotly charts and structured tables, including responsive
+overflow controls for narrow viewports. Legacy inline-HTML and hosted-page chart artifacts are
+blocked with an explicit warning; they are never injected into the page or loaded in an iframe.
+
+Assistant text supports GitHub-Flavored Markdown, KaTeX, clickable Markdown/HTML links, and basic
+sanitized HTML. Scripts, event handlers, iframes, and custom CSS are not supported. Fenced HTML
+is displayed as code, not executed. The unused `interactive` block/event has been removed.
 
 ### Conversation and run management
 HomeAI creates each conversation UUID and uses it as the LangGraph `thread_id`. `useChat` keeps

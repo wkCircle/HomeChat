@@ -14,7 +14,6 @@ import type {
   ChatMessage,
   FuncCallEndPart,
   FuncCallStartPart,
-  InteractivePart,
   MonitorPart,
   UIPart,
 } from '@/lib/types';
@@ -111,10 +110,10 @@ function FuncCallEndBlock({ part }: { part: FuncCallEndPart }) {
   );
 }
 
-function ArtifactBlock({ part }: { part: UIPart | InteractivePart }) {
+function ArtifactBlock({ part }: { part: UIPart }) {
   return (
     <div className="my-2">
-      <ArtifactRenderer artifact={part.artifact} kind={part.type} />
+      <ArtifactRenderer artifact={part.artifact} />
     </div>
   );
 }
@@ -173,7 +172,6 @@ function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick }: { msg
             case StreamTypeEnum.FUNC_CALL_END:
               return <FuncCallEndBlock key={i} part={part} />;
             case StreamTypeEnum.UI:
-            case StreamTypeEnum.INTERACTIVE:
               return <ArtifactBlock key={i} part={part} />;
             case StreamTypeEnum.MONITOR:
               return <MonitorBlock key={i} part={part} />;

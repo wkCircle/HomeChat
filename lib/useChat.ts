@@ -593,14 +593,6 @@ export function routeEvent(parts: MessagePart[], event: StreamEvent): MessagePar
           artifact: (content['artifact'] as Record<string, unknown>) ?? {},
         },
       ];
-    case StreamTypeEnum.INTERACTIVE:
-      return [
-        ...parts,
-        {
-          type: StreamTypeEnum.INTERACTIVE,
-          artifact: (content['artifact'] as Record<string, unknown>) ?? {},
-        },
-      ];
     case StreamTypeEnum.MONITOR:
       return [...parts, { type: StreamTypeEnum.MONITOR, usage: content }];
     case StreamTypeEnum.ERROR:
