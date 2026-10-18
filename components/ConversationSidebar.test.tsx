@@ -8,6 +8,7 @@ const conversation: ConversationSummary = {
   id: 'conversation-1',
   title: 'New chat',
   pinned: false,
+  tool_settings: {},
   run_status: null,
   active_run_id: null,
   created_at: '2026-08-31T00:00:00Z',

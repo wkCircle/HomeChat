@@ -1,10 +1,10 @@
-// ─── Stream event types (mirrors source/lib/fastapi/schema.py StreamTypeEnum) ─
+// â”€â”€â”€ Stream event types (mirrors source/lib/fastapi/schema.py StreamTypeEnum) â”€
 
 /** Sole product default; backend requests must always include the selected model. */
 export const DEFAULT_MODEL = 'gpt-6-luna';
 
 /**
- * String-keyed constant object — the TypeScript equivalent of Python's StrEnum.
+ * String-keyed constant object â€” the TypeScript equivalent of Python's StrEnum.
  * Values are plain strings so they survive JSON serialisation and switch narrowing.
  */
 export const StreamTypeEnum = {
@@ -28,12 +28,35 @@ export interface StreamEvent {
   metadata: Record<string, unknown>;
 }
 
-// ─── Per-message part types ───────────────────────────────────────────────────
+// â”€â”€â”€ Per-message part types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-export type TextPart        = { type: typeof StreamTypeEnum.TEXT;           text: string };
+/** Harness-verified source metadata; mirrors backend CitationSource. */
+export interface CitationSource {
+  id: string;
+  url: string;
+  title?: string | null;
+  hostname: string;
+  published_at?: string | null;
+}
+
+/** Half-open range in decoded text, in Unicode code points, NOT JS UTF-16 units. */
+export interface TextCitation {
+  source_id: string;
+  start_index: number;
+  end_index: number;
+}
+
+/** Additive text payload; old streams/history may omit source and citation lists. */
+export interface CitationTextContent {
+  text: string;
+  sources?: CitationSource[];
+  citations?: TextCitation[];
+}
+
+export type TextPart = { type: typeof StreamTypeEnum.TEXT } & CitationTextContent;
 export type ReasoningPart   = { type: typeof StreamTypeEnum.REASONING;      text: string };
 
-/** Keyed by stringified index ("0", "1", …). Each value is a LangChain tool_call dict. */
+/** Keyed by stringified index ("0", "1", â€¦). Each value is a LangChain tool_call dict. */
 export type FuncCallStartPart = { type: typeof StreamTypeEnum.FUNC_CALL_START; calls: Record<string, unknown> };
 
 /** Mirrors ToolContext fields sent in FUNC_CALL_END events. */
@@ -60,7 +83,7 @@ export type MessagePart =
   | MonitorPart
   | ErrorPart;
 
-// ─── Chat message ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Chat message â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export interface ChatMessage {
   id: string;
@@ -69,7 +92,7 @@ export interface ChatMessage {
   status?: MessageStatus;
 }
 
-// ─── Conversation and history API contracts ─────────────────────────────────
+// â”€â”€â”€ Conversation and history API contracts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type MessageStatus = 'completed' | 'streaming' | 'interrupted' | 'failed';
 export type RunStatus = 'running' | 'completed' | 'interrupted' | 'failed';
@@ -100,10 +123,41 @@ export interface ModelsResponse {
   pricing: Record<string, ModelPricing | null>;
 }
 
+/** Known optional capabilities. Missing flags remain off, including after upgrades. */
+export type ToolId = 'web_search';
+export type ToolPreferences = Partial<Record<ToolId, boolean>>;
+
+export interface ToolDefinition {
+  id: ToolId;
+  label: string;
+  description: string;
+  kind: 'function' | 'mcp' | 'provider';
+  provider: string | null;
+}
+
+export interface ToolCatalogResponse {
+  tools: ToolDefinition[];
+}
+
+export interface ConversationUpdate {
+  title?: string;
+  pinned?: boolean;
+  tool_settings?: ToolPreferences;
+}
+
+export interface UserSettings {
+  theme: 'system' | 'light' | 'dark';
+  font_size: 'small' | 'medium' | 'large';
+  tool_defaults: ToolPreferences;
+}
+
+export type UserSettingsUpdate = Partial<UserSettings>;
+
 export interface ConversationSummary {
   id: string;
   title: string;
   pinned: boolean;
+  tool_settings: ToolPreferences;
   run_status: RunStatus | null;
   active_run_id: string | null;
   created_at: string;
@@ -135,6 +189,10 @@ export interface StoredMessage {
 }
 
 export interface ConversationUsage {
+  web_search_calls: number;
+  estimated_model_cost_usd: number | null;
+  estimated_tool_cost_usd: number | null;
+  pricing_complete: boolean;
   conversation_id: string; invocations: number; input_tokens: number; cached_input_tokens: number; cache_write_tokens: number; output_tokens: number; total_tokens: number; estimated_cost_usd: number | null; latest_input_tokens: number; latest_model: string | null;
 }
 
