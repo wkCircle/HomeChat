@@ -119,10 +119,23 @@ Favicons use the authenticated, owner/source-ID backend endpoint through the exi
 proxy. No arbitrary URL or third-party favicon request is sent from the browser; unavailable images
 use a local globe. The proxy preserves binary data and the backend's safe cache/CSP/nosniff headers.
 
-The usage dialog separates model tokens, observed completed searches and native/context charges.
-Missing prices, interrupted work or unknown search-token attribution show an incomplete estimate,
-not free work. Totals include the existing title/chat/compaction semantics. Live OpenAI billing
-attribution and the final rollout gate are tracked in the backend web-search implementation plan.
+The usage dialog separates **Model token cost**, observed completed searches and native/context
+charges. Token counts remain visible independently of pricing. Missing prices, interrupted work or
+unknown search-token attribution show an incomplete estimate, not free work. The optional
+`estimated_search_call_cost_usd` subtotal displays known call fees excluding unresolved context;
+it never substitutes for an unknown total. An empty model-pricing catalog needs backend configuration
+or reviewed database pricing setup, not a different model allowlist format. Totals include the
+existing title/chat/compaction semantics. Live OpenAI billing attribution and the final rollout gate
+are tracked in the backend web-search implementation plan.
+
+Hosted search uses the existing grey start and green/red result boxes when tool-call display is
+on. Matching provider-response/call IDs prevent duplicate cards at final graph updates; persisted
+parts use the existing replay path. Cards show bounded exposed queries/actions and source metadata,
+not raw search/page bodies. The installed backend LangChain adapter forwards completed hosted-tool
+items but drops raw start/searching SSE events: currently cards normally first appear at completion,
+before the following answer, rather than indicating the exact search-start instant. No search is
+claimed just because the toggle is on. Old messages cannot gain cards retroactively from billing
+records, which deliberately omit queries.
 
 Before acceptance, build and test desktop/mobile citation hover, focus, long-hold, outside/Escape,
 long hostnames, grouped sources, sanitized HTML, ordinary links/code, Stop/reload and cost examples.

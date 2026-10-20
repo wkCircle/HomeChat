@@ -30,3 +30,28 @@ describe('conversation search costs', () => {
     expect(screen.getByText('$0.12')).toBeInTheDocument();
   });
 });
+
+
+it('keeps token counts visible when pricing is unavailable and explains the difference', () => {
+  render(<ConversationUsageButton usage={{
+    ...usage, estimated_model_cost_usd: null, estimated_tool_cost_usd: null,
+    estimated_cost_usd: null, pricing_complete: false,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.getByText('Model token cost')).toBeInTheDocument();
+  expect(screen.getByText(/Token counts below are independent of pricing/)).toBeInTheDocument();
+  expect(screen.getByText('Input')).toBeInTheDocument();
+  expect(screen.getByText('Output')).toBeInTheDocument();
+  expect(screen.getAllByText('Unavailable')).toHaveLength(3);
+});
+
+it('shows known search-call fees without presenting them as the complete search charge', () => {
+  render(<ConversationUsageButton usage={{
+    ...usage, estimated_tool_cost_usd: null, estimated_search_call_cost_usd: 0.03,
+    estimated_cost_usd: null, pricing_complete: false,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.getByText('Search call fees (excluding context): $0.03')).toBeInTheDocument();
+  expect(screen.getAllByText('Unavailable')).toHaveLength(2);
+  expect(screen.getByText(/A search count alone is not a complete price/)).toBeInTheDocument();
+});

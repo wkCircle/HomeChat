@@ -86,11 +86,26 @@ export function ConversationUsageButton({
             </span>
           </div>
           <dl className="mb-3 space-y-1">
-            <div className="flex justify-between"><dt>Model tokens</dt><dd>{usd(usage?.estimated_model_cost_usd)}</dd></div>
+            <div className="flex justify-between"><dt>Model token cost</dt><dd>{usd(usage?.estimated_model_cost_usd)}</dd></div>
             <div className="flex justify-between"><dt>Web searches</dt><dd>{usage?.web_search_calls ?? 0}</dd></div>
             <div className="flex justify-between"><dt>Search charges</dt><dd>{usd(usage?.estimated_tool_cost_usd)}</dd></div>
           </dl>
-          {usage && !usage.pricing_complete && <p className="mb-3 text-amber-700 dark:text-amber-300">Incomplete estimate: missing rates, interrupted work, or unknown search-token attribution.</p>}
+          {usage && !usage.pricing_complete && (
+            <div className="mb-3 space-y-1 text-amber-700 dark:text-amber-300">
+              <p>Incomplete estimate: missing rates, interrupted work, or unknown search-token attribution.</p>
+              {usage.estimated_model_cost_usd == null && (
+                <p>Model cost needs effective pricing rates and completed usage. Token counts below are independent of pricing.</p>
+              )}
+              {usage.estimated_tool_cost_usd == null && (
+                <>
+                  {usage.estimated_search_call_cost_usd != null && (
+                    <p>Search call fees (excluding context): {usd(usage.estimated_search_call_cost_usd)}</p>
+                  )}
+                  <p>Search charges need call pricing, completed observations, and verified search-context billing. A search count alone is not a complete price.</p>
+                </>
+              )}
+            </div>
+          )}
           <div className="mb-3">
             <div className="mb-1 flex justify-between">
               <span>Context window</span>

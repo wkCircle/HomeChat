@@ -101,3 +101,27 @@ describe('verified citation markup', () => {
     expect(screen.getByRole('link', {name: 'Unrelated'})).toBeInTheDocument();
   });
 });
+
+
+it.each(['success', 'error'] as const)('renders web-search action and %s using existing tool boxes', status => {
+  const messages: ChatMessage[] = [{id: 'search', role: 'assistant', parts: [
+    {type: 'function_call_start', calls: {'0': {
+      id: 'web_search:response:call', name: 'web_search', args: {type: 'search', query: 'Hamburg weather'},
+    }}},
+    {type: 'function_call_end', tool_call_id: 'web_search:response:call', name: 'web_search', status,
+      content: {sources: [{url: 'https://example.com/'}], note: 'Provider metadata, not raw page bodies.'}},
+  ]}];
+  render(<MessageList messages={messages} isLoading />);
+  expect(screen.getByText('Called web_search')).toBeInTheDocument();
+  expect(screen.getByText(/Hamburg weather/)).toBeInTheDocument();
+  expect(screen.getByText(new RegExp(`web_search.*${status}`))).toHaveClass(status === 'success' ? 'text-green-700' : 'text-red-700');
+  expect(screen.getByText(/Provider metadata, not raw page bodies/)).toBeInTheDocument();
+});
+
+it('renders a pending search only when an actual start event exists', () => {
+  render(<MessageList messages={[{id: 'search', role: 'assistant', parts: [{
+    type: 'function_call_start', calls: {'0': {id: 'call', name: 'web_search', args: {}}},
+  }]}]} isLoading />);
+  expect(screen.getByText(/Calling web_search/)).toBeInTheDocument();
+  expect(screen.queryByText('Called web_search')).not.toBeInTheDocument();
+});

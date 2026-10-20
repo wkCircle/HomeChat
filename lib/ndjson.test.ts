@@ -57,3 +57,28 @@ describe('late citation snapshots over split NDJSON', () => {
     expect(parts[0]).toMatchObject({type:'text',part_id,...content});
   });
 });
+
+
+it.each([1, 3, 4096])('replays hosted tool cards from split/coalesced %i-byte NDJSON chunks', async size => {
+  const {routeEvent} = await import('./useChat');
+  const events: StreamEvent[] = [
+    {type: 'function_call_start', content: {'0': {
+      id: 'web_search:response:call', name: 'web_search', args: {type: 'search', query: 'Hamburg weather'},
+    }}, metadata: {}},
+    {type: 'function_call_end', content: {
+      tool_call_id: 'web_search:response:call', name: 'web_search', status: 'success',
+      content: {sources: [{url: 'https://example.com/'}]},
+    }, metadata: {}},
+  ];
+  const bytes = new TextEncoder().encode(events.map(event => JSON.stringify(event)).join('\n')+'\n');
+  const parser = new NdjsonParser<StreamEvent>();
+  const parsed: StreamEvent[] = [];
+  for (let i = 0; i < bytes.length; i += size) parsed.push(...parser.push(bytes.slice(i, i + size)));
+  parsed.push(...parser.finish());
+  const parts = parsed.reduce<import('./types').MessagePart[]>(routeEvent, []);
+  expect(parts).toHaveLength(2);
+  expect(parts[0]).toMatchObject({type: 'function_call_start', calls: events[0].content});
+  expect(parts[1]).toMatchObject({type: 'function_call_end', ...events[1].content});
+  const restored = events.reduce<import('./types').MessagePart[]>(routeEvent, []);
+  expect(parts).toEqual(restored);
+});
