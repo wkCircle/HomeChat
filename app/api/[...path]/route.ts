@@ -56,6 +56,9 @@ async function proxy(
       'www-authenticate',
       'location',
       'x-run-id',
+      'x-content-type-options',
+      'content-security-policy',
+      'vary',
     ];
     for (const k of pass) {
       const v = upstream.headers.get(k);

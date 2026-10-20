@@ -10,6 +10,8 @@ import rehypeSanitize from 'rehype-sanitize';
 import rehypeKatex from 'rehype-katex';
 import { StreamTypeEnum } from '@/lib/types';
 import ArtifactRenderer from './ArtifactRenderer';
+import { CitationGroup } from './Citation';
+import { citationPlugin } from '@/lib/citations';
 import type {
   ChatMessage,
   FuncCallEndPart,
@@ -129,7 +131,7 @@ function MonitorBlock({ part }: { part: MonitorPart }) {
 
 // ─── Single message ───────────────────────────────────────────────────────────
 
-function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick }: { msg: ChatMessage; isLoading?: boolean; isCompacting?: boolean; onAvatarClick?: () => void }) {
+function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick, conversationId }: { msg: ChatMessage; isLoading?: boolean; isCompacting?: boolean; onAvatarClick?: () => void; conversationId?: string }) {
   // Build set of tool_call_ids that have a matching func_call_end part
   const resolvedIds = new Set(
     msg.parts
@@ -155,7 +157,15 @@ function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick }: { msg
                 <div key={i} className="prose prose-sm min-w-0 max-w-full break-words dark:prose-invert prose-pre:whitespace-pre-wrap">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+                    rehypePlugins={[rehypeRaw, rehypeSanitize, citationPlugin(part), rehypeKatex]}
+                    components={{
+                      cite: ({node, children}) => {
+                        const ids = node?.properties.dataSourceIds;
+                        const sources = Array.isArray(ids) ? (part.sources ?? []).filter(source => ids.includes(source.id)) : [];
+                        return sources.length ? <CitationGroup sources={sources} conversationId={conversationId}/> : <cite>{children}</cite>;
+                      },
+                      a: ({node: _node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"/>,
+                    }}
                   >
                     {part.text}
                   </ReactMarkdown>
@@ -221,7 +231,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 
-export function MessageList({ messages, isLoading, isCompacting }: { messages: ChatMessage[]; isLoading?: boolean; isCompacting?: boolean }) {
+export function MessageList({ messages, isLoading, isCompacting, conversationId }: { messages: ChatMessage[]; isLoading?: boolean; isCompacting?: boolean; conversationId?: string }) {
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   return (
     <div className="space-y-4">
@@ -233,6 +243,7 @@ export function MessageList({ messages, isLoading, isCompacting }: { messages: C
           <AssistantMessage
             key={msg.id}
             msg={msg}
+            conversationId={conversationId}
             isLoading={isLastMsg ? isLoading : false}
             isCompacting={isLastMsg ? isCompacting : false}
             onAvatarClick={() => setIsAvatarOpen(true)}

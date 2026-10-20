@@ -195,7 +195,7 @@ export default function ChatPage() {
                 <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">What can I help with?</h2>
               </div>
             ) : (
-              <MessageList messages={chat.messages} isLoading={chat.isLoading} isCompacting={chat.isCompacting} />
+              <MessageList conversationId={chat.selectedConversationId ?? undefined} messages={chat.messages} isLoading={chat.isLoading} isCompacting={chat.isCompacting} />
             )}
             {(chat.error || actionError) && (
               <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">

@@ -90,8 +90,9 @@ composer controls. Then run the production build.
 - Changes are shown after a successful save. Send waits for pending settings writes; failures
   retain confirmed values and show a retry action. Changing tools does not change the model
   or interrupt an active response. Backend run settings are captured for the next prompt.
-- **Web search execution is not active yet.** These controls save preferences only until the
-  separate backend search/citation phase is enabled; both panels disclose this limitation.
+- **Activation remains gated pending live provider/release acceptance.** Search execution,
+  citation persistence/previews and cost accounting are implemented and tested offline. The temporary
+  backend rollout allowlist remains empty; both panels still disclose that search is not active.
 
 The UI uses the existing same-origin authenticated settings, tool catalog, and conversation APIs.
 No additional frontend environment variables, dependencies, or SQL changes are needed for these
@@ -100,6 +101,31 @@ controls. The backend preferences migration must already be deployed when using 
 Before acceptance, run `npm run build` and verify at desktop/mobile widths: open General/Tools,
 change theme/font/defaults, set a chat override, switch chats and reload, and confirm explicit off
 survives a global default change. Also verify model/usage/Send/Stop and keyboard focus still work.
+
+
+### Native citations and search cost
+
+Native text events may have a stable `part_id`. Repeated events with that ID are full snapshots,
+not text deltas: the hook updates the existing part in place, including late source/citation data.
+Legacy text-only streams still append normally. Restored and interrupted answers use the same path.
+Citation ranges are Unicode code points in the decoded Markdown/HTML source, not UTF-16 indices.
+
+After HTML sanitization, verified references become grouped hostname/favicon pills. Hover/focus or
+500 ms touch hold opens an interactive, viewport-clamped source dialog; normal touch is usable,
+movement/scroll cancels a pending hold, and outside/Escape closes it. Source titles/dates only appear
+when provided; ordinary links and code remain unchanged. Model previews reuse the shared hook.
+
+Favicons use the authenticated, owner/source-ID backend endpoint through the existing same-origin
+proxy. No arbitrary URL or third-party favicon request is sent from the browser; unavailable images
+use a local globe. The proxy preserves binary data and the backend's safe cache/CSP/nosniff headers.
+
+The usage dialog separates model tokens, observed completed searches and native/context charges.
+Missing prices, interrupted work or unknown search-token attribution show an incomplete estimate,
+not free work. Totals include the existing title/chat/compaction semantics. Live OpenAI billing
+attribution and the final rollout gate are tracked in the backend web-search implementation plan.
+
+Before acceptance, build and test desktop/mobile citation hover, focus, long-hold, outside/Escape,
+long hostnames, grouped sources, sanitized HTML, ordinary links/code, Stop/reload and cost examples.
 
 ---
 

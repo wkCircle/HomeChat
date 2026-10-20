@@ -39,3 +39,21 @@ describe('citation text NDJSON contract', () => {
     expect(part.sources).toBeUndefined();
   });
 });
+
+
+describe('late citation snapshots over split NDJSON', () => {
+  it.each([1,3,4096])('upserts repeated snapshots across %i-byte chunks', async size => {
+    const {routeEvent} = await import('./useChat');
+    const {part_id, ...legacy} = {part_id: 'snapshot', ...content};
+    const initial = {type: StreamTypeEnum.TEXT, content: {part_id, text: legacy.text}, metadata: {}};
+    const enriched = {type: StreamTypeEnum.TEXT, content: {part_id, ...legacy}, metadata: {}};
+    const bytes = new TextEncoder().encode([initial,enriched,enriched].map(event => JSON.stringify(event)).join('\n')+'\n');
+    const parser = new NdjsonParser<StreamEvent>();
+    const parsed: StreamEvent[] = [];
+    for (let index=0; index<bytes.length; index+=size) parsed.push(...parser.push(bytes.slice(index,index+size)));
+    parsed.push(...parser.finish());
+    const parts = parsed.reduce<import('./types').MessagePart[]>(routeEvent,[]);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({type:'text',part_id,...content});
+  });
+});

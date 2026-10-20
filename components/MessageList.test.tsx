@@ -69,3 +69,35 @@ describe('MessageList', () => {
     expect(container.querySelector('strong')).toBeNull();
   });
 });
+
+
+describe('verified citation markup', () => {
+  const sources = [
+    {id: 'a', url: 'https://example.com/a', hostname: 'example.com', title: 'First'},
+    {id: 'b', url: 'https://example.org/b', hostname: 'example.org', title: 'Second'},
+  ];
+  it.each([
+    'Claim [A](https://example.com/a) [B](https://example.org/b)',
+    '<p>Claim <a href="https://example.com/a">A</a> <a href="https://example.org/b">B</a></p>',
+  ])('groups adjacent verified links after sanitization: %s', text => {
+    render(<MessageList messages={[{id: 'cited', role: 'assistant', parts: [{type: 'text', text, sources,
+      citations: sources.map(source => ({source_id: source.id, start_index: 0, end_index: Array.from(text).length}))}]}]}/>);
+    expect(screen.getAllByRole('button', {name: 'Sources: example.com'})).toHaveLength(1);
+    expect(screen.getByText('1+')).toBeInTheDocument();
+    expect(screen.queryByRole('link', {name: 'A'})).not.toBeInTheDocument();
+  });
+  it('handles Unicode code-point ranges and preserves claim text', () => {
+    const text = '\u{1f600} Claim. Next';
+    render(<MessageList messages={[{id: 'unicode', role: 'assistant', parts: [{type: 'text', text, sources: [sources[0]],
+      citations: [{source_id: 'a', start_index: 2, end_index: 8}]}]}]}/>);
+    expect(screen.getByRole('button', {name: 'Sources: example.com'})).toBeInTheDocument();
+    expect(screen.getByText(/Next/)).toBeInTheDocument();
+  });
+  it('never transforms code or unrelated links into citation controls', () => {
+    const text = '`Claim` [Unrelated](https://unrelated.example)';
+    render(<MessageList messages={[{id: 'code', role: 'assistant', parts: [{type: 'text', text, sources: [sources[0]],
+      citations: [{source_id: 'a', start_index: 1, end_index: 6}]}]}]}/>);
+    expect(screen.queryByRole('button', {name: /Sources:/})).not.toBeInTheDocument();
+    expect(screen.getByRole('link', {name: 'Unrelated'})).toBeInTheDocument();
+  });
+});

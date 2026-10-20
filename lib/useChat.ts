@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import apiFetch, { responseError } from './api';
+import { readCitationContent } from './citations';
 import { useUserSettings } from './useUserSettings';
 import { mergeConversations } from './conversations';
 import { NdjsonParser } from './ndjson';
@@ -684,13 +685,18 @@ export function routeEvent(parts: MessagePart[], event: StreamEvent): MessagePar
 
   switch (event.type) {
     case StreamTypeEnum.TEXT: {
-      const incoming = (content['text'] as string) ?? '';
-      if (!incoming) return parts;
-      const last = parts[parts.length - 1];
-      if (last?.type === StreamTypeEnum.TEXT) {
-        return [...parts.slice(0, -1), { ...last, text: last.text + incoming }];
+      const snapshot = readCitationContent(content);
+      if (!snapshot.text) return parts;
+      if (snapshot.part_id) {
+        const index = parts.findIndex(part => part.type === StreamTypeEnum.TEXT && part.part_id === snapshot.part_id);
+        const next = {type: StreamTypeEnum.TEXT, ...snapshot};
+        return index < 0 ? [...parts, next] : parts.map((part, position) => position === index ? next : part);
       }
-      return [...parts, { type: StreamTypeEnum.TEXT, text: incoming }];
+      const last = parts[parts.length - 1];
+      if (!snapshot.sources && !snapshot.citations && last?.type === StreamTypeEnum.TEXT && !last.part_id && !last.sources && !last.citations) {
+        return [...parts.slice(0, -1), {...last, text: last.text + snapshot.text}];
+      }
+      return [...parts, {type: StreamTypeEnum.TEXT, ...snapshot}];
     }
     case StreamTypeEnum.REASONING: {
       const incoming = (content['text'] as string) ?? '';

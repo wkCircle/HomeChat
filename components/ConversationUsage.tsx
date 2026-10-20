@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { ConversationUsage } from "@/lib/types";
+const usd = (value: number | null | undefined) => value == null ? 'Unavailable'
+  : new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 6}).format(value);
 const tokens = (value: number) =>
   new Intl.NumberFormat("en-US", {
     notation: "compact",
@@ -80,11 +82,15 @@ export function ConversationUsageButton({
           <div className="mb-3 flex justify-between text-sm font-medium">
             <span>Session cost</span>
             <span>
-              {usage?.estimated_cost_usd == null
-                ? "Unavailable"
-                : `$${usage.estimated_cost_usd.toFixed(2)}`}
+              {usd(usage?.estimated_cost_usd)}
             </span>
           </div>
+          <dl className="mb-3 space-y-1">
+            <div className="flex justify-between"><dt>Model tokens</dt><dd>{usd(usage?.estimated_model_cost_usd)}</dd></div>
+            <div className="flex justify-between"><dt>Web searches</dt><dd>{usage?.web_search_calls ?? 0}</dd></div>
+            <div className="flex justify-between"><dt>Search charges</dt><dd>{usd(usage?.estimated_tool_cost_usd)}</dd></div>
+          </dl>
+          {usage && !usage.pricing_complete && <p className="mb-3 text-amber-700 dark:text-amber-300">Incomplete estimate: missing rates, interrupted work, or unknown search-token attribution.</p>}
           <div className="mb-3">
             <div className="mb-1 flex justify-between">
               <span>Context window</span>

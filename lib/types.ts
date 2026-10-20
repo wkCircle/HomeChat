@@ -49,6 +49,8 @@ export interface TextCitation {
 /** Additive text payload; old streams/history may omit source and citation lists. */
 export interface CitationTextContent {
   text: string;
+  /** Stable snapshot identity: repeated text events replace this part in place. */
+  part_id?: string | null;
   sources?: CitationSource[];
   citations?: TextCitation[];
 }
