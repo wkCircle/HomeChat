@@ -106,9 +106,9 @@ it('explains search fees from the adjacent info icon on hover', () => {
   const tooltip = screen.getByRole('tooltip');
   expect(info).toHaveAttribute('aria-describedby', tooltip.id);
   expect(tooltip).toHaveTextContent('Only completed OpenAI search actions');
-  expect(tooltip).toHaveTextContent('across all turns');
+  expect(tooltip).toHaveTextContent('incur search-call fees');
   expect(tooltip).toHaveTextContent('open_page');
-  expect(tooltip).toHaveTextContent('find_in_page');
+  expect(tooltip).toHaveTextContent('find-in-page');
   expect(tooltip).toHaveTextContent('Model token charges are separate');
   fireEvent.mouseLeave(info, { relatedTarget: tooltip });
   fireEvent.mouseEnter(tooltip);
@@ -144,4 +144,30 @@ it('supports a tap and clears the explanation on blur or panel close', () => {
   fireEvent.click(toggle);
   expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   expect(screen.queryByText('Search actions across all turns; page opens/finds excluded.')).not.toBeInTheDocument();
+});
+
+
+it('keeps known call fees visible after Stop without presenting them as the full charge', () => {
+  render(<ConversationUsageButton usage={{
+    ...usage, search_call_pricing_complete: false, estimated_search_call_cost_usd: 0.03,
+    estimated_model_cost_usd: null, estimated_tool_cost_usd: null,
+    estimated_cost_usd: null, pricing_complete: false,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button', { name: /Context usage/ }));
+  expect(screen.getByText('Known search call fees').parentElement).toHaveTextContent('$0.03');
+  expect(screen.getAllByText('Unavailable')).toHaveLength(2);
+  expect(screen.getByText(/search-call accounting incomplete; showing known fees only/)).toBeInTheDocument();
+  expect(screen.queryByText('Search charges')).not.toBeInTheDocument();
+});
+
+it('never turns unknown interrupted-call fees into a free estimate', () => {
+  render(<ConversationUsageButton usage={{
+    ...usage, search_call_pricing_complete: false, estimated_search_call_cost_usd: null,
+    estimated_model_cost_usd: null, estimated_tool_cost_usd: null,
+    estimated_cost_usd: null, pricing_complete: false,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button', { name: /Context usage/ }));
+  expect(screen.getByText('Search call fees').parentElement).toHaveTextContent('Unavailable');
+  expect(screen.getByText(/search-call rates or final usage missing/)).toBeInTheDocument();
+  expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
 });

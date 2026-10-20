@@ -133,10 +133,13 @@ circled info button beside **Web searches** explains search-call fees versus ope
 separate model-token charges on hover, keyboard focus or tap. With the info button focused, Escape
 dismisses the tooltip before the usage panel. Token counts remain visible independently of pricing. Missing prices, interrupted work or
 unknown search-token attribution show an incomplete estimate, not free work. The optional
-`estimated_search_call_cost_usd` subtotal displays known call fees excluding unresolved context.
-When the complete charge is unknown, the main row is labeled **Search call fees** and shows that
-subtotal; when the complete tool charge is known, it remains **Search charges**. No partial fee is
-presented as the session total. One concise yellow notice lists the remaining unknowns. An empty model-pricing catalog needs backend configuration
+`estimated_search_call_cost_usd` subtotal displays known completed-call fees excluding unresolved
+context. The optional `search_call_pricing_complete` flag is false when native work or rates are
+incomplete. After Stop and continuation, known priced calls still accumulate; partial amounts are
+labeled **Known search call fees** with an incomplete-accounting notice. Unknown fees with no priced
+completed calls remain unavailable, never a fabricated zero. Otherwise the row is **Search call
+fees**, or **Search charges** when the full tool cost is known. Older server responses without the
+flag retain their previous display. No partial fee is presented as the session total. One concise yellow notice lists the remaining unknowns. An empty model-pricing catalog needs backend configuration
 or reviewed database pricing setup, not a different model allowlist format. Totals include the
 existing title/chat/compaction semantics. Live OpenAI billing attribution and the final rollout gate
 are tracked in the backend web-search implementation plan.

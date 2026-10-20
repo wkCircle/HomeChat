@@ -56,13 +56,17 @@ export function ConversationUsageButton({
 }) {
   const [open, setOpen] = useState(false);
   const searchCost = usage?.estimated_tool_cost_usd ?? usage?.estimated_search_call_cost_usd;
-  const searchLabel = usage?.estimated_tool_cost_usd != null ? 'Search charges' : 'Search call fees';
+  const knownFeesOnly = usage?.search_call_pricing_complete === false && searchCost != null;
+  const searchLabel = usage?.estimated_tool_cost_usd != null ? 'Search charges'
+    : knownFeesOnly ? 'Known search call fees' : 'Search call fees';
   const incompleteReasons: string[] = [];
   if (usage && !usage.pricing_complete) {
     if (usage.estimated_model_cost_usd == null) incompleteReasons.push('model rates or final usage missing');
     if (usage.estimated_tool_cost_usd == null) {
       incompleteReasons.push(usage.estimated_search_call_cost_usd == null
-        ? 'search-call rates or final usage missing' : 'search-content billing unverified');
+        ? 'search-call rates or final usage missing'
+        : knownFeesOnly ? 'search-call accounting incomplete; showing known fees only'
+          : 'search-content billing unverified');
     }
   }
   const ref = useRef<HTMLDivElement>(null);

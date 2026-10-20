@@ -197,8 +197,10 @@ export interface ConversationUsage {
   web_search_calls: number;
   estimated_model_cost_usd: number | null;
   estimated_tool_cost_usd: number | null;
-  /** Search-call fees only, excluding unresolved search-context charges. Older servers may omit it. */
+  /** Known completed-call fees; may be a lower bound. Excludes search-context charges. */
   estimated_search_call_cost_usd?: number | null;
+  /** False for unfinished/unpriced search activity. Older servers may omit this flag. */
+  search_call_pricing_complete?: boolean;
   pricing_complete: boolean;
   conversation_id: string; invocations: number; input_tokens: number; cached_input_tokens: number; cache_write_tokens: number; output_tokens: number; total_tokens: number; estimated_cost_usd: number | null; latest_input_tokens: number; latest_model: string | null;
 }
