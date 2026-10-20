@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import apiFetch from './api';
+import apiFetch, { responseError } from './api';
+import { useUserSettings } from './useUserSettings';
 import { mergeConversations } from './conversations';
 import { NdjsonParser } from './ndjson';
 import { DEFAULT_MODEL, StreamTypeEnum } from './types';
@@ -17,19 +18,12 @@ import type {
   RunStatusResponse,
   StoredMessage,
   StreamEvent,
+  ToolId,
+  UserSettingsUpdate,
 } from './types';
 
 function randomId(): string {
   return Math.random().toString(36).slice(2, 10);
-}
-
-async function responseError(response: Response, fallback: string): Promise<Error> {
-  try {
-    const body = (await response.json()) as { detail?: string; error?: string };
-    return new Error(body.detail ?? body.error ?? fallback);
-  } catch {
-    return new Error(fallback);
-  }
 }
 
 function storedMessageToChatMessage(message: StoredMessage): ChatMessage {
@@ -57,6 +51,7 @@ export function useChat({
   returnReasoning = true,
   returnFuncCallInfo = true,
 }: UseChatOptions = {}) {
+  const preferences = useUserSettings();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -83,6 +78,54 @@ export function useChat({
   const runIdsByConversation = useRef(new Map<string, string>());
   const pendingRunIdsByConversation = useRef(new Map<string, PendingRunId>());
   const stoppedRunIds = useRef(new Set<string>());
+  const selectedIdRef = useRef(selectedConversationId);
+  selectedIdRef.current = selectedConversationId;
+  const toolVersions = useRef(new Map<string, number>());
+  const toolReads = useRef(new Map<string, number>());
+  const toolSaves = useRef(new Set<string>());
+  const [savingTools, setSavingTools] = useState<Record<string, boolean>>({});
+  const [loadingTools, setLoadingTools] = useState<Record<string, boolean>>({});
+  const [toolErrors, setToolErrors] = useState<Record<string, string | null>>({});
+  const draftToolsKey = '__draft__';
+
+  const mergeServerConversations = useCallback((
+    incoming: ConversationSummary[], versions: Map<string, number>,
+  ) => {
+    setConversations((current) => mergeConversations(current, incoming.map((item) => {
+      const confirmed = current.find((conversation) => conversation.id === item.id);
+      return confirmed && (versions.get(item.id) ?? 0) !== (toolVersions.current.get(item.id) ?? 0)
+        ? { ...item, tool_settings: confirmed.tool_settings }
+        : item;
+    })));
+  }, []);
+
+  const refreshConversationTools = useCallback(async (conversationId: string) => {
+    const version = toolVersions.current.get(conversationId) ?? 0;
+    const request = (toolReads.current.get(conversationId) ?? 0) + 1;
+    toolReads.current.set(conversationId, request);
+    setLoadingTools((current) => ({ ...current, [conversationId]: true }));
+    try {
+      const response = await apiFetch(`/api/chat/conversations/${encodeURIComponent(conversationId)}/messages?limit=1`);
+      if (!response.ok) throw await responseError(response, 'Unable to load chat tool settings.');
+      const history = (await response.json()) as ConversationHistory;
+      if (toolReads.current.get(conversationId) === request
+        && (toolVersions.current.get(conversationId) ?? 0) === version
+        && !toolSaves.current.has(conversationId)) {
+        setConversations((current) => current.map((conversation) => conversation.id === conversationId
+          ? { ...conversation, tool_settings: history.conversation.tool_settings } : conversation));
+        setToolErrors((current) => ({ ...current, [conversationId]: null }));
+      }
+    } catch (error) {
+      if (toolReads.current.get(conversationId) === request
+        && (toolVersions.current.get(conversationId) ?? 0) === version) {
+        setToolErrors((current) => ({ ...current, [conversationId]: error instanceof Error ? error.message : String(error) }));
+      }
+    } finally {
+      if (toolReads.current.get(conversationId) === request) {
+        setLoadingTools((current) => ({ ...current, [conversationId]: false }));
+      }
+    }
+  }, []);
 
   const synchronizeActiveRunIds = (items: ConversationSummary[]) => {
     for (const conversation of items) {
@@ -115,6 +158,7 @@ export function useChat({
   const loadHistory = useCallback(async (conversationId: string) => {
     if (historyRequests.current.has(conversationId)) return;
     historyRequests.current.add(conversationId);
+    const versions = new Map(toolVersions.current);
     try {
       const response = await apiFetch(`/api/chat/conversations/${encodeURIComponent(conversationId)}/messages`);
       if (!response.ok) {
@@ -131,7 +175,7 @@ export function useChat({
         ...current,
         [conversationId]: history.messages.map(storedMessageToChatMessage),
       }));
-      setConversations((current) => mergeConversations(current, [conversation]));
+      mergeServerConversations([conversation], versions);
       void loadUsage(conversationId);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -139,7 +183,7 @@ export function useChat({
     } finally {
       historyRequests.current.delete(conversationId);
     }
-  }, [loadUsage]);
+  }, [loadUsage, mergeServerConversations]);
 
   useEffect(() => {
     let active = true;
@@ -169,6 +213,7 @@ export function useChat({
       }
       // History can restore a bookmarked conversation outside the first sidebar page.
       const initialId = requestedConversationId || firstId;
+      selectedIdRef.current = initialId;
       setSelectedConversationId(initialId);
       if (initialId) void loadHistory(initialId);
       setIsInitializing(false);
@@ -205,7 +250,7 @@ export function useChat({
     return () => window.clearInterval(timer);
   }, [conversations, loadHistory]);
 
-  const createConversation = useCallback(async () => {
+  const createConversation = useCallback(async (select = true) => {
     const unused = conversations.find(
       (conversation) =>
         conversation.title === 'New chat'
@@ -214,7 +259,7 @@ export function useChat({
     );
     if (unused) {
       setErrorsByConversation((current) => ({ ...current, [unused.id]: null }));
-      setSelectedConversationId(unused.id);
+      if (select) { selectedIdRef.current = unused.id; setSelectedConversationId(unused.id); }
       return unused;
     }
 
@@ -231,20 +276,23 @@ export function useChat({
       [conversation.id]: current[conversation.id] ?? [],
     }));
     setErrorsByConversation((current) => ({ ...current, [conversation.id]: null }));
-    setSelectedConversationId(conversation.id);
+    if (select) { selectedIdRef.current = conversation.id; setSelectedConversationId(conversation.id); }
     return conversation;
   }, [conversations, messagesByConversation, streamingByConversation]);
 
   const selectConversation = useCallback(
     (conversationId: string) => {
+      selectedIdRef.current = conversationId;
       setSelectedConversationId(conversationId);
       setErrorsByConversation((current) => ({ ...current, [conversationId]: null }));
       if (!(conversationId in messagesByConversation)) void loadHistory(conversationId);
+      else void refreshConversationTools(conversationId);
     },
-    [loadHistory, messagesByConversation],
+    [loadHistory, messagesByConversation, refreshConversationTools],
   );
 
   const renameConversation = useCallback(async (conversationId: string, title: string) => {
+    const versions = new Map(toolVersions.current);
     const response = await apiFetch(`/api/chat/conversations/${conversationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -254,10 +302,11 @@ export function useChat({
       throw await responseError(response, `Unable to rename conversation (${response.status})`);
     }
     const updated = (await response.json()) as ConversationSummary;
-    setConversations((current) => mergeConversations(current, [updated]));
-  }, []);
+    mergeServerConversations([updated], versions);
+  }, [mergeServerConversations]);
 
   const setConversationPinned = useCallback(async (conversationId: string, pinned: boolean) => {
+    const versions = new Map(toolVersions.current);
     const response = await apiFetch(`/api/chat/conversations/${conversationId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -267,8 +316,8 @@ export function useChat({
       throw await responseError(response, `Unable to update conversation (${response.status})`);
     }
     const updated = (await response.json()) as ConversationSummary;
-    setConversations((current) => mergeConversations(current, [updated]));
-  }, []);
+    mergeServerConversations([updated], versions);
+  }, [mergeServerConversations]);
 
   const deleteConversation = useCallback(
     async (conversationId: string) => {
@@ -302,6 +351,7 @@ export function useChat({
   const loadMoreConversations = useCallback(async () => {
     if (!nextCursor || isLoadingMore) return;
     setIsLoadingMore(true);
+    const versions = new Map(toolVersions.current);
     try {
       const response = await apiFetch(
         `/api/chat/conversations?limit=20&cursor=${encodeURIComponent(nextCursor)}`,
@@ -312,17 +362,83 @@ export function useChat({
       const page = (await response.json()) as ConversationPage;
       const conversations = summariesWithCurrentRunStatus(page.conversations);
       synchronizeActiveRunIds(conversations);
-      setConversations((current) => mergeConversations(current, conversations));
+      mergeServerConversations(conversations, versions);
       setNextCursor(page.next_cursor);
     } finally {
       setIsLoadingMore(false);
     }
-  }, [isLoadingMore, nextCursor]);
+  }, [isLoadingMore, nextCursor, mergeServerConversations]);
+
+  const setConversationTool = useCallback(async (toolId: ToolId, enabled: boolean) => {
+    const selectedId = selectedIdRef.current;
+    const key = selectedId ?? draftToolsKey;
+    let targetId = selectedId;
+    if (toolSaves.current.has(key)) return;
+    toolSaves.current.add(key);
+    setSavingTools((current) => ({ ...current, [key]: true }));
+    setToolErrors((current) => ({ ...current, [key]: null }));
+    try {
+      if (preferences.isSaving()) throw new Error('Wait for default settings to finish saving.');
+      if (!selectedId) {
+        const conversation = await createConversation(false);
+        targetId = conversation.id;
+        toolSaves.current.add(targetId);
+        setSavingTools((current) => ({ ...current, [conversation.id]: true }));
+        if (selectedIdRef.current === null) {
+          selectedIdRef.current = conversation.id;
+          setSelectedConversationId(conversation.id);
+        }
+      }
+      if (!targetId) throw new Error('No conversation is available for tool settings.');
+      toolVersions.current.set(targetId, (toolVersions.current.get(targetId) ?? 0) + 1);
+      const response = await apiFetch(`/api/chat/conversations/${encodeURIComponent(targetId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool_settings: { [toolId]: enabled } }),
+      });
+      if (!response.ok) throw await responseError(response, 'Unable to save chat tool settings.');
+      const updated = (await response.json()) as ConversationSummary;
+      setConversations((current) => current.map((conversation) => conversation.id === updated.id
+        ? { ...conversation, tool_settings: updated.tool_settings, updated_at: updated.updated_at }
+        : conversation));
+      setToolErrors((current) => ({ ...current, [updated.id]: null }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setToolErrors((current) => ({ ...current, [key]: message, ...(targetId ? { [targetId]: message } : {}) }));
+    } finally {
+      toolSaves.current.delete(key);
+      if (targetId) {
+        toolSaves.current.delete(targetId);
+        toolVersions.current.set(targetId, (toolVersions.current.get(targetId) ?? 0) + 1);
+      }
+      setSavingTools((current) => ({ ...current, [key]: false, ...(targetId ? { [targetId]: false } : {}) }));
+    }
+  }, [createConversation, preferences.isSaving]);
+
+  const saveUserSettings = useCallback(async (update: UserSettingsUpdate) => {
+    const saved = await preferences.saveSettings(update);
+    const selectedId = selectedIdRef.current;
+    if (saved && update.tool_defaults) {
+      for (const conversation of conversations) {
+        toolVersions.current.set(conversation.id, (toolVersions.current.get(conversation.id) ?? 0) + 1);
+      }
+      if (selectedId) await refreshConversationTools(selectedId);
+    }
+    return saved;
+  }, [conversations, preferences.saveSettings, refreshConversationTools]);
+
+  const retryToolSettings = useCallback(async () => {
+    await preferences.reloadSettings();
+    const selectedId = selectedIdRef.current;
+    if (selectedId) await refreshConversationTools(selectedId);
+  }, [preferences.reloadSettings, refreshConversationTools]);
 
   const append = useCallback(
     async (userMessage: string, selectedModel = DEFAULT_MODEL) => {
       const trimmedMessage = userMessage.trim();
       if (!trimmedMessage) return;
+      if (preferences.isSaving() || toolSaves.current.has(selectedIdRef.current ?? draftToolsKey)) {
+        throw new Error('Wait for tool settings to finish saving before sending.');
+      }
 
       let conversation = conversations.find((item) => item.id === selectedConversationId);
       if (!conversation) conversation = await createConversation();
@@ -401,11 +517,13 @@ export function useChat({
 
         const reader = response.body.getReader();
         const parser = new NdjsonParser<StreamEvent>();
+        let streamFailed = false;
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           for (const event of parser.push(value)) {
+            if (event.type === StreamTypeEnum.ERROR) streamFailed = true;
             if (event.type === StreamTypeEnum.COMPACTING) {
               setCompactingByConversation((current) => ({
                 ...current,
@@ -417,6 +535,7 @@ export function useChat({
           }
         }
         for (const event of parser.finish()) {
+          if (event.type === StreamTypeEnum.ERROR) streamFailed = true;
           if (event.type === StreamTypeEnum.COMPACTING) {
             setCompactingByConversation((current) => ({
               ...current,
@@ -426,14 +545,14 @@ export function useChat({
           }
           updateParts((parts) => routeEvent(parts, event));
         }
-        const finalStatus = stoppedRunIds.current.has(runId) ? 'interrupted' : 'completed';
+        const finalStatus = stoppedRunIds.current.has(runId) ? 'interrupted' : streamFailed ? 'failed' : 'completed';
         setMessagesByConversation((current) => ({
           ...current,
           [conversationId]: (current[conversationId] ?? []).map((message) =>
             message.id === assistantId ? { ...message, status: finalStatus } : message,
           ),
         }));
-        if (finalStatus === 'completed') { await loadHistory(conversationId); await loadUsage(conversationId); }
+        if (finalStatus !== 'interrupted') { await loadHistory(conversationId); await loadUsage(conversationId); }
       } catch (error) {
         if (controller.signal.aborted) return;
         const message = error instanceof Error ? error.message : String(error);
@@ -468,6 +587,7 @@ export function useChat({
       returnFuncCallInfo,
       returnReasoning,
       selectedConversationId,
+      preferences.isSaving,
     ],
   );
 
@@ -525,6 +645,15 @@ export function useChat({
 
   return {
     conversations,
+    preferences: { ...preferences, saveSettings: saveUserSettings },
+    selectedToolSettings: selectedConversation?.tool_settings ?? preferences.settings?.tool_defaults ?? {},
+    isSavingConversationTools: Boolean(savingTools[selectedConversationId ?? draftToolsKey]),
+    isLoadingConversationTools: Boolean(loadingTools[selectedConversationId ?? draftToolsKey])
+      || isInitializing || preferences.isLoadingSettings || !preferences.settings
+      || Boolean(selectedConversationId && !selectedConversation),
+    toolSettingsError: toolErrors[selectedConversationId ?? draftToolsKey] ?? preferences.error,
+    setConversationTool,
+    retryToolSettings,
     selectedConversation,
     selectedConversationId,
     messages,

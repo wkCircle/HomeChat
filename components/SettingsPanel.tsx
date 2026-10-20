@@ -1,137 +1,111 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { UserSettingsController } from '@/lib/useUserSettings';
+import type { UserSettings } from '@/lib/types';
 
-type Theme = 'system' | 'light' | 'dark';
-type Size = 'small' | 'medium' | 'large';
-
+type Size = UserSettings['font_size'];
 const SIZES: Size[] = ['small', 'medium', 'large'];
 const SIZE_PX: Record<Size, string> = { small: '13px', medium: '15px', large: '17px' };
 
-export function SettingsPanel() {
+export function SettingsPanel({ preferences }: { preferences: UserSettingsController }) {
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState<Theme>('system');
-  const [size, setSize] = useState<Size>('medium');
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [section, setSection] = useState<'general' | 'tools'>('general');
+  const panel = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const theme = preferences.settings?.theme ?? 'system';
+  const size = preferences.settings?.font_size ?? 'medium';
+  const disabled = preferences.isLoadingSettings || preferences.isSavingSettings || !preferences.settings;
 
-  // Apply theme to <html>
   useEffect(() => {
     const root = document.documentElement;
-    const apply = (dark: boolean) =>
-      dark ? root.classList.add('dark') : root.classList.remove('dark');
-
-    if (theme === 'dark') { apply(true); return; }
-    if (theme === 'light') { apply(false); return; }
-    // system
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    apply(mq.matches);
-    const listener = (e: MediaQueryListEvent) => apply(e.matches);
-    mq.addEventListener('change', listener);
-    return () => mq.removeEventListener('change', listener);
+    const apply = (dark: boolean) => root.classList.toggle('dark', dark);
+    if (theme !== 'system') { apply(theme === 'dark'); return; }
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    apply(media.matches);
+    const change = (event: MediaQueryListEvent) => { apply(event.matches); };
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
   }, [theme]);
-
-  // Apply font size to <html>
-  useEffect(() => {
-    document.documentElement.style.fontSize = SIZE_PX[size];
-  }, [size]);
-
-  // Close on outside click
+  useEffect(() => { document.documentElement.style.fontSize = SIZE_PX[size]; }, [size]);
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node))
-        setOpen(false);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    panel.current?.focus();
+    const keyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { event.preventDefault(); setOpen(false); return; }
+      if (event.key !== 'Tab') return;
+      const buttons = panel.current?.querySelectorAll<HTMLElement>(':is(button, select, [tabindex="0"]):not(:disabled)');
+      if (!buttons?.length) return;
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel.current)) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === panel.current)) {
+        event.preventDefault(); first.focus();
+      }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('keydown', keyboard);
+    return () => {
+      document.removeEventListener('keydown', keyboard);
+      document.body.style.overflow = previousOverflow;
+      trigger.current?.focus();
+    };
   }, [open]);
 
   const sizeIdx = SIZES.indexOf(size);
-
-  return (
-    <div className="relative" ref={panelRef}>
-      {/* Gear icon button */}
-      <button
-        onClick={() => setOpen((o) => !o)}
-        title="Settings"
-        aria-label="Settings"
-        className="rounded p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-700"
-      >
-        <GearIcon />
-      </button>
-
-      {/* Floating panel */}
-      {open && (
-        <div className="absolute right-0 top-10 z-50 w-60 rounded-lg border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800">
-
-          {/* Theme */}
-          <div className="mb-4">
-            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              Theme
-            </label>
-            <select
-              value={theme}
-              onChange={(e) => setTheme(e.target.value as Theme)}
-              className="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            >
-              <option value="system">System default</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </div>
-
-          {/* Font size */}
-          <div>
-            <label className="mb-2 block text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              Font size
-            </label>
-            <div className="flex items-center gap-2">
-              {/* − button */}
-              <button
-                onClick={() => setSize(SIZES[Math.max(0, sizeIdx - 1)])}
-                disabled={sizeIdx === 0}
-                aria-label="Decrease font size"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-gray-300 text-base font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-30 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-              >
-                −
-              </button>
-
-              {/* Discrete track */}
-              <div className="flex flex-1 items-center gap-1.5">
-                {SIZES.map((s, i) => (
-                  <button
-                    key={s}
-                    onClick={() => setSize(s)}
-                    aria-label={s}
-                    className={`h-2 flex-1 rounded-full transition-colors ${
-                      i === sizeIdx
-                        ? 'bg-indigo-500'
-                        : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500'
-                    }`}
-                  />
-                ))}
-              </div>
-
-              {/* + button */}
-              <button
-                onClick={() => setSize(SIZES[Math.min(SIZES.length - 1, sizeIdx + 1)])}
-                disabled={sizeIdx === SIZES.length - 1}
-                aria-label="Increase font size"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded border border-gray-300 text-base font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-30 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
-              >
-                +
-              </button>
-            </div>
-
-            {/* Current size label */}
-            <p className="mt-1.5 text-center text-[11px] capitalize text-gray-400 dark:text-gray-500">
-              {size}
-            </p>
-          </div>
+  return <>
+    <button ref={trigger} type="button" onClick={() => setOpen(true)} title="Settings" aria-label="Settings"
+      aria-haspopup="dialog" aria-expanded={open}
+      className="rounded p-1.5 text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-400 dark:hover:bg-gray-700"><GearIcon /></button>
+    {open && <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+      <div ref={panel} role="dialog" aria-modal="true" aria-labelledby="settings-title" tabIndex={-1}
+        className="w-full max-w-xl overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl focus:outline-none dark:border-gray-700 dark:bg-gray-800">
+        <header className="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
+          <h2 id="settings-title" className="font-semibold text-gray-900 dark:text-gray-100">Settings</h2>
+          <button type="button" aria-label="Close settings" onClick={() => setOpen(false)} className="rounded px-2 py-1 text-gray-500 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-indigo-400 dark:text-gray-300 dark:hover:bg-gray-700">Close</button>
+        </header>
+        <div className="flex min-h-72">
+          <nav aria-label="Settings sections" className="w-28 shrink-0 border-r border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/30">
+            {(['general', 'tools'] as const).map((item) => <button key={item} type="button"
+              aria-current={section === item ? 'page' : undefined} onClick={() => setSection(item)}
+              className={`mb-1 w-full rounded-md px-3 py-2 text-left text-sm capitalize focus-visible:ring-2 focus-visible:ring-indigo-400 ${section === item ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'}`}>{item}</button>)}
+          </nav>
+          <section aria-label={section === 'general' ? 'General settings' : 'Tool defaults'} className="max-h-[70dvh] min-w-0 flex-1 overflow-y-auto p-4">
+            {preferences.isLoadingSettings && <p role="status" className="mb-3 text-sm text-gray-500">Loading settings...</p>}
+            {preferences.error && <div className="mb-3 text-sm text-red-600 dark:text-red-300"><p role="alert">{preferences.error}</p><button type="button" disabled={preferences.isLoadingSettings || preferences.isSavingSettings} onClick={() => void preferences.reloadSettings()} className="mt-1 underline">Retry loading settings</button></div>}
+            {section === 'general' ? <>
+              <label htmlFor="settings-theme" className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-200">Theme</label>
+              <select id="settings-theme" value={theme} disabled={disabled} onChange={(event) => {
+                const value = event.target.value;
+                if (value === 'system' || value === 'light' || value === 'dark') void preferences.saveSettings({ theme: value });
+              }} className="mb-5 w-full rounded border border-gray-300 bg-white px-2 py-2 text-sm text-gray-800 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
+                <option value="system">System default</option><option value="light">Light</option><option value="dark">Dark</option>
+              </select>
+              <h3 className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">Font size</h3>
+              <div className="flex items-center gap-2">
+                <button type="button" disabled={disabled || sizeIdx === 0} aria-label="Decrease font size" onClick={() => void preferences.saveSettings({ font_size: SIZES[Math.max(0, sizeIdx - 1)] })} className="h-8 w-8 rounded border border-gray-300 text-gray-600 disabled:opacity-30 dark:border-gray-600 dark:text-gray-200">-</button>
+                <div className="flex flex-1 gap-1.5">{SIZES.map((value, index) => <button key={value} type="button" aria-label={value} aria-pressed={sizeIdx === index} disabled={disabled} onClick={() => void preferences.saveSettings({ font_size: value })} className={`h-3 flex-1 rounded-full focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:opacity-50 ${index === sizeIdx ? 'bg-indigo-500' : 'bg-gray-200 dark:bg-gray-600'}`} />)}</div>
+                <button type="button" disabled={disabled || sizeIdx === SIZES.length - 1} aria-label="Increase font size" onClick={() => void preferences.saveSettings({ font_size: SIZES[Math.min(SIZES.length - 1, sizeIdx + 1)] })} className="h-8 w-8 rounded border border-gray-300 text-gray-600 disabled:opacity-30 dark:border-gray-600 dark:text-gray-200">+</button>
+              </div><p className="mt-2 text-center text-xs capitalize text-gray-500 dark:text-gray-400">{size}</p>
+            </> : <>
+              <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-gray-100">Default tools</h3>
+              <p className="mb-4 text-xs text-gray-500 dark:text-gray-400">Defaults apply to new chats and chats without an explicit choice. Existing chat choices stay unchanged.</p>
+              {preferences.tools.map((tool) => <div key={tool.id} className="mb-4 flex items-start justify-between gap-3">
+                <div><span className="text-sm font-medium text-gray-900 dark:text-gray-100">{tool.label}</span><p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{tool.description}</p></div>
+                <button type="button" role="switch" aria-label={`Default ${tool.label}`} aria-checked={preferences.settings?.tool_defaults[tool.id] === true} disabled={disabled}
+                  onClick={() => void preferences.saveSettings({ tool_defaults: { [tool.id]: !preferences.settings?.tool_defaults[tool.id] } })}
+                  className={`relative h-6 w-11 shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:opacity-50 ${preferences.settings?.tool_defaults[tool.id] ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}><span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${preferences.settings?.tool_defaults[tool.id] ? 'translate-x-5' : ''}`} /></button>
+              </div>)}
+              <p className="text-xs text-amber-700 dark:text-amber-300">Preferences are saved, but web search execution is not active in this release.</p>
+            </>}
+            {preferences.isSavingSettings && <p role="status" className="mt-3 text-xs text-gray-500">Saving settings...</p>}
+          </section>
         </div>
-      )}
-    </div>
-  );
+      </div>
+    </div>}
+  </>;
 }
 
 function GearIcon() {
