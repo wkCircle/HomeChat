@@ -79,6 +79,18 @@ function ReasoningBlock({ text }: { text: string }) {
   );
 }
 
+function toolLabel(name: string | undefined, action: unknown): string {
+  if (name !== 'web_search' || !action || typeof action !== 'object' || !('type' in action)) {
+    return name ?? 'unknown';
+  }
+  switch (action.type) {
+    case 'search': return 'web_search (search)';
+    case 'open_page': return 'web_search (open page)';
+    case 'find_in_page': return 'web_search (find in page)';
+    default: return name;
+  }
+}
+
 function FuncCallStartBlock({ part, isResolved }: { part: FuncCallStartPart; isResolved: boolean }) {
   const calls = Object.values(part.calls) as { name?: string; args?: Record<string, unknown> }[];
   return (
@@ -86,7 +98,7 @@ function FuncCallStartBlock({ part, isResolved }: { part: FuncCallStartPart; isR
       {calls.map((c, i) => (
         <details key={i} className="rounded border border-gray-200 bg-gray-50 px-2 py-1">
           <summary className="cursor-pointer select-none">
-            {isResolved ? `Called ${c.name ?? 'unknown'}` : `Calling ${c.name ?? 'unknown'}…`}
+            {isResolved ? `Called ${toolLabel(c.name, c.args)}` : `Calling ${toolLabel(c.name, c.args)}…`}
           </summary>
           <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded bg-gray-100 p-2 text-gray-600">
             {JSON.stringify(c.args ?? {}, null, 2)}
@@ -98,12 +110,14 @@ function FuncCallStartBlock({ part, isResolved }: { part: FuncCallStartPart; isR
 }
 
 function FuncCallEndBlock({ part }: { part: FuncCallEndPart }) {
+  const action = part.content !== null && typeof part.content === 'object' && 'action' in part.content
+    ? part.content.action : undefined;
   const icon = part.status === 'success' ? '✓' : '✗';
   const color = part.status === 'success' ? 'text-green-700' : 'text-red-700';
   return (
     <details className="my-1 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
       <summary className={`cursor-pointer font-medium select-none ${color}`}>
-        {icon} {part.name} — {part.status}
+        {icon} {toolLabel(part.name, action)} — {part.status}
       </summary>
       <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-gray-100 p-2 text-gray-700">
         {typeof part.content === 'string' ? part.content : JSON.stringify(part.content, null, 2)}

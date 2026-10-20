@@ -77,3 +77,71 @@ it('shows zero charges only when the backend explicitly reports no charge', () =
   expect(screen.getByText('Search charges').parentElement).toHaveTextContent('$0.00');
   expect(screen.queryByText(/Incomplete estimate/)).not.toBeInTheDocument();
 });
+
+
+it('uses cumulative backend totals when a second prompt finishes', () => {
+  const { rerender } = render(<ConversationUsageButton usage={{
+    ...usage, estimated_tool_cost_usd: null, estimated_cost_usd: null, pricing_complete: false,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.getByText('Web searches').parentElement).toHaveTextContent('3');
+  expect(screen.getByText('Search call fees').parentElement).toHaveTextContent('$0.03');
+  rerender(<ConversationUsageButton usage={{
+    ...usage, invocations: 2, web_search_calls: 7, estimated_search_call_cost_usd: 0.07,
+    estimated_tool_cost_usd: null, estimated_cost_usd: null, pricing_complete: false,
+  }} contextWindowTokens={1000} />);
+  expect(screen.getByText('Web searches').parentElement).toHaveTextContent('7');
+  expect(screen.getByText('Search call fees').parentElement).toHaveTextContent('$0.07');
+  expect(screen.getByRole('button', { name: 'About web search counts and fees' })).toBeInTheDocument();
+});
+
+
+it('explains search fees from the adjacent info icon on hover', () => {
+  render(<ConversationUsageButton usage={usage} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button', { name: /Context usage/ }));
+  const info = screen.getByRole('button', { name: 'About web search counts and fees' });
+  expect(info.closest('dt')).toBe(screen.getByText('Web searches'));
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  fireEvent.mouseEnter(info);
+  const tooltip = screen.getByRole('tooltip');
+  expect(info).toHaveAttribute('aria-describedby', tooltip.id);
+  expect(tooltip).toHaveTextContent('Only completed OpenAI search actions');
+  expect(tooltip).toHaveTextContent('across all turns');
+  expect(tooltip).toHaveTextContent('open_page');
+  expect(tooltip).toHaveTextContent('find_in_page');
+  expect(tooltip).toHaveTextContent('Model token charges are separate');
+  fireEvent.mouseLeave(info, { relatedTarget: tooltip });
+  fireEvent.mouseEnter(tooltip);
+  expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  fireEvent.mouseLeave(tooltip, { relatedTarget: document.body });
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+});
+
+it('supports keyboard focus and dismisses info before the usage panel with Escape', () => {
+  render(<ConversationUsageButton usage={usage} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button', { name: /Context usage/ }));
+  const info = screen.getByRole('button', { name: 'About web search counts and fees' });
+  fireEvent.focus(info);
+  expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  fireEvent.keyDown(info, { key: 'Escape' });
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: 'Conversation usage' })).toBeInTheDocument();
+  fireEvent.keyDown(info, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+it('supports a tap and clears the explanation on blur or panel close', () => {
+  render(<ConversationUsageButton usage={usage} contextWindowTokens={1000} />);
+  const toggle = screen.getByRole('button', { name: /Context usage/ });
+  fireEvent.click(toggle);
+  const info = screen.getByRole('button', { name: 'About web search counts and fees' });
+  fireEvent.click(info);
+  expect(screen.getByRole('tooltip')).toBeInTheDocument();
+  fireEvent.blur(info);
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  fireEvent.click(info);
+  fireEvent.click(toggle);
+  fireEvent.click(toggle);
+  expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  expect(screen.queryByText('Search actions across all turns; page opens/finds excluded.')).not.toBeInTheDocument();
+});

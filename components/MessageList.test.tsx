@@ -112,7 +112,7 @@ it.each(['success', 'error'] as const)('renders web-search action and %s using e
       content: {sources: [{url: 'https://example.com/'}], note: 'Provider metadata, not raw page bodies.'}},
   ]}];
   render(<MessageList messages={messages} isLoading />);
-  expect(screen.getByText('Called web_search')).toBeInTheDocument();
+  expect(screen.getByText('Called web_search (search)')).toBeInTheDocument();
   expect(screen.getByText(/Hamburg weather/)).toBeInTheDocument();
   expect(screen.getByText(new RegExp(`web_search.*${status}`))).toHaveClass(status === 'success' ? 'text-green-700' : 'text-red-700');
   expect(screen.getByText(/Provider metadata, not raw page bodies/)).toBeInTheDocument();
@@ -124,4 +124,30 @@ it('renders a pending search only when an actual start event exists', () => {
   }]}]} isLoading />);
   expect(screen.getByText(/Calling web_search/)).toBeInTheDocument();
   expect(screen.queryByText('Called web_search')).not.toBeInTheDocument();
+});
+
+
+it.each([
+  ['search', 'search'], ['open_page', 'open page'], ['find_in_page', 'find in page'],
+])('distinguishes hosted %s actions in pending and completed cards', (action, label) => {
+  const messages: ChatMessage[] = [{ id: 'hosted', role: 'assistant', parts: [
+    { type: 'function_call_start', calls: { '0': { id: 'call', name: 'web_search', args: { type: action } } } },
+    { type: 'function_call_end', tool_call_id: 'call', name: 'web_search', status: 'success', content: { action: { type: action } } },
+  ] }];
+  const { rerender } = render(<MessageList messages={[{ ...messages[0], parts: [messages[0].parts[0]] }]} isLoading />);
+  expect(screen.getByText(`Calling web_search (${label})\u2026`)).toBeInTheDocument();
+  rerender(<MessageList messages={messages} />);
+  expect(screen.getByText(`Called web_search (${label})`)).toBeInTheDocument();
+  expect(screen.getByText(`\u2713 web_search (${label}) \u2014 success`)).toBeInTheDocument();
+});
+
+it('keeps custom-tool names and legacy hosted results unchanged', () => {
+  render(<MessageList messages={[{ id: 'legacy', role: 'assistant', parts: [
+    { type: 'function_call_start', calls: { '0': { id: 'custom', name: 'create_graph', args: { type: 'search' } } } },
+    { type: 'function_call_end', tool_call_id: 'custom', name: 'create_graph', status: 'success', content: { action: { type: 'open_page' } } },
+    { type: 'function_call_end', tool_call_id: 'hosted', name: 'web_search', status: 'error', content: 'Legacy unavailable result' },
+  ] }]} />);
+  expect(screen.getByText('Called create_graph')).toBeInTheDocument();
+  expect(screen.getByText('\u2713 create_graph \u2014 success')).toBeInTheDocument();
+  expect(screen.getByText('\u2717 web_search \u2014 error')).toBeInTheDocument();
 });

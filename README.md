@@ -125,7 +125,11 @@ public icon requests. Icons are temporary memory-cache entries, not stored chat 
 refetch them, and a disappeared icon leaves the source link usable with the globe fallback.
 
 The usage dialog separates **Model token cost**, observed completed searches and native/context
-charges. Token counts remain visible independently of pricing. Missing prices, interrupted work or
+charges. **Web searches** accumulates completed search actions across all turns, excluding page opens
+and find-in-page actions. Three actual searches followed by four show seven, not four. A small
+circled info button beside **Web searches** explains search-call fees versus open/find actions and
+separate model-token charges on hover, keyboard focus or tap. With the info button focused, Escape
+dismisses the tooltip before the usage panel. Token counts remain visible independently of pricing. Missing prices, interrupted work or
 unknown search-token attribution show an incomplete estimate, not free work. The optional
 `estimated_search_call_cost_usd` subtotal displays known call fees excluding unresolved context.
 When the complete charge is unknown, the main row is labeled **Search call fees** and shows that
@@ -136,7 +140,9 @@ existing title/chat/compaction semantics. Live OpenAI billing attribution and th
 are tracked in the backend web-search implementation plan.
 
 Hosted search uses the existing grey start and green/red result boxes when tool-call display is
-on. Matching provider-response/call IDs prevent duplicate cards at final graph updates; persisted
+on. Headers distinguish `web_search (search)`, `web_search (open page)` and
+`web_search (find in page)` so not every hosted-tool card is mistaken for a billable search.
+Matching provider-response/call IDs prevent duplicate cards at final graph updates; persisted
 parts use the existing replay path. Cards show bounded exposed queries/actions and source metadata,
 not raw search/page bodies. The installed backend LangChain adapter forwards completed hosted-tool
 items but drops raw start/searching SSE events: currently cards normally first appear at completion,
