@@ -123,7 +123,7 @@ export interface ModelsResponse {
   pricing: Record<string, ModelPricing | null>;
 }
 
-/** Known optional capabilities. Missing flags remain off, including after upgrades. */
+/** Known optional capabilities. Resolve chat choices over global defaults; otherwise off. */
 export type ToolId = 'web_search';
 export type ToolPreferences = Partial<Record<ToolId, boolean>>;
 
@@ -149,9 +149,12 @@ export interface UserSettings {
   theme: 'system' | 'light' | 'dark';
   font_size: 'small' | 'medium' | 'large';
   tool_defaults: ToolPreferences;
+  /** Null before preferences have first been saved. Server-managed timestamps. */
+  created_at: string | null;
+  updated_at: string | null;
 }
 
-export type UserSettingsUpdate = Partial<UserSettings>;
+export type UserSettingsUpdate = Partial<Pick<UserSettings, 'theme' | 'font_size' | 'tool_defaults'>>;
 
 export interface ConversationSummary {
   id: string;
