@@ -10,6 +10,20 @@ const usage: ConversationUsage = {
   estimated_tool_cost_usd: 0.03, estimated_search_call_cost_usd: 0.03, estimated_cost_usd: 0.15, web_search_calls: 3, pricing_complete: true
 };
 
+it('shows a complete one-search estimate when search tokens are covered by model usage', () => {
+  render(<ConversationUsageButton usage={{
+    ...usage, web_search_calls: 1, search_call_pricing_complete: true,
+    estimated_tool_cost_usd: 0.01, estimated_search_call_cost_usd: 0.01,
+    estimated_model_cost_usd: 0.12, estimated_cost_usd: 0.13, pricing_complete: true,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.getByText('Search charges').parentElement).toHaveTextContent('$0.01');
+  expect(screen.getByText('$0.12')).toBeInTheDocument();
+  expect(screen.getByText('$0.13')).toBeInTheDocument();
+  expect(screen.queryByText(/Incomplete estimate/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/search-content billing unverified/)).not.toBeInTheDocument();
+});
+
 describe('conversation search costs', () => {
   it('shows total and separate token/search estimates', () => {
     render(<ConversationUsageButton usage={usage} contextWindowTokens={1000} />);

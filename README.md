@@ -126,23 +126,25 @@ citation path/query, cookies, authorization or Referer. Target sites still see t
 public icon requests. Icons are temporary memory-cache entries, not stored chat assets: replay may
 refetch them, and a disappeared icon leaves the source link usable with the globe fallback.
 
-The usage dialog separates **Model token cost**, observed completed searches and native/context
-charges. **Web searches** accumulates completed search actions across all turns, excluding page opens
+The usage dialog separates **Model token cost**, observed completed searches and native call
+charges. The backend's approved policy includes search content in reported model-token usage,
+without adding a second token charge; completed, fully priced runs do not show an unverified-content
+warning. Historical missing/null attribution uses the same policy on read. **Web searches** accumulates completed search actions across all turns, excluding page opens
 and find-in-page actions. Three actual searches followed by four show seven, not four. A small
 circled info button beside **Web searches** explains search-call fees versus open/find actions and
 separate model-token charges on hover, keyboard focus or tap. With the info button focused, Escape
 dismisses the tooltip before the usage panel. Token counts remain visible independently of pricing. Missing prices, interrupted work or
-unknown search-token attribution show an incomplete estimate, not free work. The optional
-`estimated_search_call_cost_usd` subtotal displays known completed-call fees excluding unresolved
-context. The optional `search_call_pricing_complete` flag is false when native work or rates are
+unresolved explicit separate-token billing show an incomplete estimate, not free work. The optional
+`estimated_search_call_cost_usd` subtotal displays known completed-call fees; ordinary search tokens
+are already accounted for in model usage. The optional `search_call_pricing_complete` flag is false when native work or rates are
 incomplete. After Stop and continuation, known priced calls still accumulate; partial amounts are
 labeled **Known search call fees** with an incomplete-accounting notice. Unknown fees with no priced
 completed calls remain unavailable, never a fabricated zero. Otherwise the row is **Search call
 fees**, or **Search charges** when the full tool cost is known. Older server responses without the
 flag retain their previous display. No partial fee is presented as the session total. One concise yellow notice lists the remaining unknowns. An empty model-pricing catalog needs backend configuration
 or reviewed database pricing setup, not a different model allowlist format. Totals include the
-existing title/chat/compaction semantics. Live OpenAI billing attribution and the final rollout gate
-are tracked in the backend web-search implementation plan.
+existing title/chat/compaction semantics. Provider invoice reconciliation and the final rollout gate
+remain tracked in the backend web-search implementation plan; this policy is not an invoice audit.
 
 Hosted search uses the existing grey start and green/red result boxes when tool-call display is
 on. Headers distinguish `web_search (search)`, `web_search (open page)` and
