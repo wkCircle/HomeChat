@@ -34,7 +34,7 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('switch', { name: 'Default Web search' }));
     expect(preferences.saveSettings).toHaveBeenCalledWith({ tool_defaults: { web_search: true } });
     expect(screen.getByRole('switch')).not.toBeChecked();
-    expect(screen.getByText(/execution is not active/)).toBeInTheDocument();
+    expect(screen.queryByText(/execution is not active/i)).not.toBeInTheDocument();
   });
 
   it('traps keyboard focus, dismisses with Escape and restores scroll/focus', () => {

@@ -90,9 +90,11 @@ composer controls. Then run the production build.
 - Changes are shown after a successful save. Send waits for pending settings writes; failures
   retain confirmed values and show a retry action. Changing tools does not change the model
   or interrupt an active response. Backend run settings are captured for the next prompt.
-- **Activation remains gated pending live provider/release acceptance.** Search execution,
-  citation persistence/previews and cost accounting are implemented and tested offline. The temporary
-  backend rollout allowlist remains empty; both panels still disclose that search is not active.
+- Web search binds to the selected model when the saved chat choice is on; it remains off by default.
+  The temporary backend model allowlist and both outdated inactive-execution notices have been
+  removed. Owner authorization and the reviewed direct OpenAI endpoint remain required; provider
+  incompatibility is an explicit error, not an ignored switch. Existing on choices activate search
+  on the next prompt after the backend update.
 
 The UI uses the existing same-origin authenticated settings, tool catalog, and conversation APIs.
 No additional frontend environment variables, dependencies, or SQL changes are needed for these

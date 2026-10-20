@@ -98,7 +98,6 @@ export function SettingsPanel({ preferences }: { preferences: UserSettingsContro
                   onClick={() => void preferences.saveSettings({ tool_defaults: { [tool.id]: !preferences.settings?.tool_defaults[tool.id] } })}
                   className={`relative h-6 w-11 shrink-0 rounded-full focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:opacity-50 ${preferences.settings?.tool_defaults[tool.id] ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'}`}><span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${preferences.settings?.tool_defaults[tool.id] ? 'translate-x-5' : ''}`} /></button>
               </div>)}
-              <p className="text-xs text-amber-700 dark:text-amber-300">Preferences are saved, but web search execution is not active in this release.</p>
             </>}
             {preferences.isSavingSettings && <p role="status" className="mt-3 text-xs text-gray-500">Saving settings...</p>}
           </section>

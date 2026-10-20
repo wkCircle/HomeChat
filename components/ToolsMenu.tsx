@@ -64,7 +64,6 @@ export function ToolsMenu({ tools, preferences, isLoading, isSaving, error, onTo
         {error && <div className="mb-2 text-xs text-red-600 dark:text-red-300"><p role="alert">{error}</p>
           <button type="button" disabled={isSaving || (isLoading && !error)} onClick={onRetry} className="mt-1 underline disabled:opacity-50">Retry loading settings</button></div>}
         <p className="text-xs text-gray-500 dark:text-gray-400">Changes apply to your next prompt, not an active response.</p>
-        <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">Preferences are saved, but web search execution is not active in this release.</p>
       </div>}
     </div>
   );

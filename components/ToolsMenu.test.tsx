@@ -7,7 +7,7 @@ function props() {
   return { tools, preferences: { web_search: false }, isLoading: false, isSaving: false, error: null, onToggle: vi.fn(), onRetry: vi.fn() };
 }
 describe('chat Tools menu', () => {
-  it('shows confirmed settings and calls a chat-scoped toggle without claiming execution is live', () => {
+  it('shows confirmed settings and calls a chat-scoped toggle without a stale inactive-execution warning', () => {
     const options = props();
     render(<ToolsMenu {...options} />);
     fireEvent.click(screen.getByRole('button', { name: 'Chat tools' }));
@@ -15,7 +15,7 @@ describe('chat Tools menu', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'false');
     fireEvent.click(toggle);
     expect(options.onToggle).toHaveBeenCalledWith('web_search', true);
-    expect(screen.getByText(/execution is not active/i)).toBeInTheDocument();
+    expect(screen.queryByText(/execution is not active/i)).not.toBeInTheDocument();
   });
   it('disables writes while saving and shows errors with retry', () => {
     const options = props();
