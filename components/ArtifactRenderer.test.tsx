@@ -12,7 +12,6 @@ describe('ArtifactRenderer', () => {
   it('renders a restored Plotly chart payload', () => {
     render(
       <ArtifactRenderer
-        kind="ui"
         artifact={{
           type: 'graph',
           renderer: 'plotly',
@@ -35,7 +34,6 @@ describe('ArtifactRenderer', () => {
   it('renders a restored table payload', () => {
     render(
       <ArtifactRenderer
-        kind="ui"
         artifact={{
           type: 'table',
           data: {
@@ -50,5 +48,19 @@ describe('ArtifactRenderer', () => {
     expect(screen.getByText('Stored table')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'name' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: '3' })).toBeInTheDocument();
+  });
+
+  it.each([
+    { format: 'html', html: '<img src="x" onerror="window.untrusted = true">' },
+    { format: 'html', url: 'https://example.com/chart.html' },
+    { html: '<iframe src="https://example.com"></iframe>' },
+    { url: 'https://example.com/chart.html' },
+  ])('blocks legacy HTML and hosted chart payloads: %j', (payload) => {
+    const { container } = render(
+      <ArtifactRenderer artifact={{ type: 'graph', renderer: 'plotly', ...payload }} />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Generate a JSON chart instead.');
+    expect(container.querySelector('iframe, img, script')).toBeNull();
+    expect(screen.queryByTestId('plotly-chart')).not.toBeInTheDocument();
   });
 });

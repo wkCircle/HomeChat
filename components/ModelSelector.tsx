@@ -1,9 +1,9 @@
 "use client";
 
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useHoverPreview } from "@/lib/useHoverPreview";
 import type { ModelPricing } from "@/lib/types";
 
-const LONG_PRESS_DURATION_MS = 500;
 
 interface ModelSelectorProps {
   models: string[];
@@ -120,20 +120,9 @@ export function ModelSelector({
   onSelect,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [hoveredModel, setHoveredModel] = useState<string | null>(null);
+  const preview = useHoverPreview<string>();
+  const {active: hoveredModel, setActive: setHoveredModel} = preview;
   const containerRef = useRef<HTMLDivElement>(null);
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressTriggeredRef = useRef(false);
-  const touchFocusRef = useRef(false);
-
-  const clearLongPressTimer = () => {
-    if (longPressTimerRef.current !== null) {
-      clearTimeout(longPressTimerRef.current);
-      longPressTimerRef.current = null;
-    }
-  };
-
-  useEffect(() => clearLongPressTimer, []);
 
   useEffect(() => {
     if (!open) return;
@@ -171,45 +160,24 @@ export function ModelSelector({
               <div
                 key={model}
                 className="relative"
-                onPointerEnter={(event) => {
-                  if (event.pointerType === "mouse") setHoveredModel(model);
-                }}
-                onPointerLeave={(event) => {
-                  if (event.pointerType === "mouse") setHoveredModel(null);
-                }}
+                onPointerEnter={(event) => preview.enter(model, event)}
+                onPointerLeave={preview.leave}
               >
                 <button
                   type="button"
                   role="option"
                   aria-selected={selected}
-                  onFocus={() => {
-                    if (!touchFocusRef.current) setHoveredModel(model);
-                  }}
+                  onFocus={() => preview.focus(model)}
                   onBlur={() => setHoveredModel(null)}
-                  onPointerDown={(event) => {
-                    touchFocusRef.current = event.pointerType === "touch";
-                    if (event.pointerType !== "touch") return;
-
-                    clearLongPressTimer();
-                    longPressTriggeredRef.current = false;
-                    setHoveredModel(null);
-                    longPressTimerRef.current = setTimeout(() => {
-                      longPressTriggeredRef.current = true;
-                      setHoveredModel(model);
-                    }, LONG_PRESS_DURATION_MS);
-                  }}
-                  onPointerUp={clearLongPressTimer}
-                  onPointerCancel={clearLongPressTimer}
-                  onPointerLeave={(event) => {
-                    if (event.pointerType === "touch") clearLongPressTimer();
-                  }}
-                  onContextMenu={(event) => {
-                    if (touchFocusRef.current) event.preventDefault();
-                  }}
+                  onPointerDown={(event) => preview.down(model, event)}
+                  onPointerMove={preview.move}
+                  onPointerUp={preview.clearTimer}
+                  onPointerCancel={preview.clearTimer}
+                  onPointerLeave={preview.leave}
+                  onContextMenu={preview.contextMenu}
                   onClick={(event) => {
-                    if (longPressTriggeredRef.current) {
+                    if (preview.consumeLongPress()) {
                       event.preventDefault();
-                      longPressTriggeredRef.current = false;
                       return;
                     }
                     onSelect(model);

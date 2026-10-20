@@ -10,11 +10,12 @@ import rehypeSanitize from 'rehype-sanitize';
 import rehypeKatex from 'rehype-katex';
 import { StreamTypeEnum } from '@/lib/types';
 import ArtifactRenderer from './ArtifactRenderer';
+import { CitationGroup } from './Citation';
+import { citationPlugin } from '@/lib/citations';
 import type {
   ChatMessage,
   FuncCallEndPart,
   FuncCallStartPart,
-  InteractivePart,
   MonitorPart,
   UIPart,
 } from '@/lib/types';
@@ -78,6 +79,18 @@ function ReasoningBlock({ text }: { text: string }) {
   );
 }
 
+function toolLabel(name: string | undefined, action: unknown): string {
+  if (name !== 'web_search' || !action || typeof action !== 'object' || !('type' in action)) {
+    return name ?? 'unknown';
+  }
+  switch (action.type) {
+    case 'search': return 'web_search (search)';
+    case 'open_page': return 'web_search (open page)';
+    case 'find_in_page': return 'web_search (find in page)';
+    default: return name;
+  }
+}
+
 function FuncCallStartBlock({ part, isResolved }: { part: FuncCallStartPart; isResolved: boolean }) {
   const calls = Object.values(part.calls) as { name?: string; args?: Record<string, unknown> }[];
   return (
@@ -85,7 +98,7 @@ function FuncCallStartBlock({ part, isResolved }: { part: FuncCallStartPart; isR
       {calls.map((c, i) => (
         <details key={i} className="rounded border border-gray-200 bg-gray-50 px-2 py-1">
           <summary className="cursor-pointer select-none">
-            {isResolved ? `Called ${c.name ?? 'unknown'}` : `Calling ${c.name ?? 'unknown'}…`}
+            {isResolved ? `Called ${toolLabel(c.name, c.args)}` : `Calling ${toolLabel(c.name, c.args)}…`}
           </summary>
           <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded bg-gray-100 p-2 text-gray-600">
             {JSON.stringify(c.args ?? {}, null, 2)}
@@ -97,12 +110,14 @@ function FuncCallStartBlock({ part, isResolved }: { part: FuncCallStartPart; isR
 }
 
 function FuncCallEndBlock({ part }: { part: FuncCallEndPart }) {
+  const action = part.content !== null && typeof part.content === 'object' && 'action' in part.content
+    ? part.content.action : undefined;
   const icon = part.status === 'success' ? '✓' : '✗';
   const color = part.status === 'success' ? 'text-green-700' : 'text-red-700';
   return (
     <details className="my-1 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs">
       <summary className={`cursor-pointer font-medium select-none ${color}`}>
-        {icon} {part.name} — {part.status}
+        {icon} {toolLabel(part.name, action)} — {part.status}
       </summary>
       <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded bg-gray-100 p-2 text-gray-700">
         {typeof part.content === 'string' ? part.content : JSON.stringify(part.content, null, 2)}
@@ -111,10 +126,10 @@ function FuncCallEndBlock({ part }: { part: FuncCallEndPart }) {
   );
 }
 
-function ArtifactBlock({ part }: { part: UIPart | InteractivePart }) {
+function ArtifactBlock({ part }: { part: UIPart }) {
   return (
     <div className="my-2">
-      <ArtifactRenderer artifact={part.artifact} kind={part.type} />
+      <ArtifactRenderer artifact={part.artifact} />
     </div>
   );
 }
@@ -130,7 +145,7 @@ function MonitorBlock({ part }: { part: MonitorPart }) {
 
 // ─── Single message ───────────────────────────────────────────────────────────
 
-function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick }: { msg: ChatMessage; isLoading?: boolean; isCompacting?: boolean; onAvatarClick?: () => void }) {
+function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick, conversationId }: { msg: ChatMessage; isLoading?: boolean; isCompacting?: boolean; onAvatarClick?: () => void; conversationId?: string }) {
   // Build set of tool_call_ids that have a matching func_call_end part
   const resolvedIds = new Set(
     msg.parts
@@ -156,7 +171,15 @@ function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick }: { msg
                 <div key={i} className="prose prose-sm min-w-0 max-w-full break-words dark:prose-invert prose-pre:whitespace-pre-wrap">
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeRaw, rehypeSanitize, rehypeKatex]}
+                    rehypePlugins={[rehypeRaw, rehypeSanitize, citationPlugin(part), rehypeKatex]}
+                    components={{
+                      cite: ({node, children}) => {
+                        const ids = node?.properties.dataSourceIds;
+                        const sources = Array.isArray(ids) ? (part.sources ?? []).filter(source => ids.includes(source.id)) : [];
+                        return sources.length ? <CitationGroup sources={sources} conversationId={conversationId}/> : <cite>{children}</cite>;
+                      },
+                      a: ({node: _node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"/>,
+                    }}
                   >
                     {part.text}
                   </ReactMarkdown>
@@ -173,7 +196,6 @@ function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick }: { msg
             case StreamTypeEnum.FUNC_CALL_END:
               return <FuncCallEndBlock key={i} part={part} />;
             case StreamTypeEnum.UI:
-            case StreamTypeEnum.INTERACTIVE:
               return <ArtifactBlock key={i} part={part} />;
             case StreamTypeEnum.MONITOR:
               return <MonitorBlock key={i} part={part} />;
@@ -223,7 +245,7 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 
-export function MessageList({ messages, isLoading, isCompacting }: { messages: ChatMessage[]; isLoading?: boolean; isCompacting?: boolean }) {
+export function MessageList({ messages, isLoading, isCompacting, conversationId }: { messages: ChatMessage[]; isLoading?: boolean; isCompacting?: boolean; conversationId?: string }) {
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
   return (
     <div className="space-y-4">
@@ -235,6 +257,7 @@ export function MessageList({ messages, isLoading, isCompacting }: { messages: C
           <AssistantMessage
             key={msg.id}
             msg={msg}
+            conversationId={conversationId}
             isLoading={isLastMsg ? isLoading : false}
             isCompacting={isLastMsg ? isCompacting : false}
             onAvatarClick={() => setIsAvatarOpen(true)}

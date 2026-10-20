@@ -6,6 +6,7 @@ import { ConversationUsageButton } from '@/components/ConversationUsage';
 import { MessageList } from '@/components/MessageList';
 import { ModelSelector } from '@/components/ModelSelector';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { ToolsMenu } from '@/components/ToolsMenu';
 import { DEFAULT_MODEL } from '@/lib/types';
 import { useChat } from '@/lib/useChat';
 
@@ -100,9 +101,15 @@ export default function ChatPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     const message = input.trim();
-    if (!message || chat.isLoading) return;
+    if (!message || chat.isLoading || chat.isSavingConversationTools || chat.preferences.isSavingSettings) return;
+    setActionError(null);
     setInput('');
-    await chat.append(message, selectedModel);
+    try {
+      await chat.append(message, selectedModel);
+    } catch (error) {
+      setInput((current) => current || message);
+      setActionError(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -175,7 +182,7 @@ export default function ChatPage() {
             >
               Logout
             </button>
-            <SettingsPanel />
+            <SettingsPanel preferences={chat.preferences} />
           </div>
         </header>
 
@@ -188,7 +195,7 @@ export default function ChatPage() {
                 <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">What can I help with?</h2>
               </div>
             ) : (
-              <MessageList messages={chat.messages} isLoading={chat.isLoading} isCompacting={chat.isCompacting} />
+              <MessageList conversationId={chat.selectedConversationId ?? undefined} messages={chat.messages} isLoading={chat.isLoading} isCompacting={chat.isCompacting} />
             )}
             {(chat.error || actionError) && (
               <p role="alert" className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
@@ -227,34 +234,44 @@ export default function ChatPage() {
               rows={1}
               className="block max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-sm text-gray-900 focus:outline-none dark:text-gray-100 dark:placeholder:text-gray-400"
             />
-            <div className="flex items-center justify-end gap-1">
-              <ModelSelector
-                models={chat.models}
-                contextWindows={chat.contextWindows}
-                pricing={chat.modelPricing}
-                selectedModel={selectedModel}
-                onSelect={setSelectedModel}
+            <div className="flex items-center justify-between gap-1">
+              <ToolsMenu key={chat.selectedConversationId ?? 'draft'}
+                tools={chat.preferences.tools} preferences={chat.selectedToolSettings}
+                isLoading={chat.isLoadingConversationTools}
+                isSaving={chat.isSavingConversationTools || chat.preferences.isSavingSettings}
+                error={chat.toolSettingsError}
+                onToggle={(id, enabled) => void chat.setConversationTool(id, enabled)}
+                onRetry={() => void chat.retryToolSettings()}
               />
-              <ConversationUsageButton usage={chat.selectedConversationUsage} contextWindowTokens={chat.contextWindows[selectedModel]} />
-              {chat.isLoading && chat.selectedConversationId ? (
-                <button
-                  type="button"
-                  onClick={() => void runAction(() => chat.stopConversation(chat.selectedConversationId!))}
-                  className="h-10 shrink-0 rounded-lg border border-red-300 px-5 text-sm font-semibold text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950"
-                >
-                  Stop
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  aria-label="Send message"
-                  title="Send message"
-                  disabled={!input.trim()}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-sm text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <i aria-hidden="true" className="fa-solid fa-paper-plane" />
-                </button>
-              )}
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-1">
+                <ModelSelector
+                  models={chat.models}
+                  contextWindows={chat.contextWindows}
+                  pricing={chat.modelPricing}
+                  selectedModel={selectedModel}
+                  onSelect={setSelectedModel}
+                />
+                <ConversationUsageButton usage={chat.selectedConversationUsage} contextWindowTokens={chat.contextWindows[selectedModel]} />
+                {chat.isLoading && chat.selectedConversationId ? (
+                  <button
+                    type="button"
+                    onClick={() => void runAction(() => chat.stopConversation(chat.selectedConversationId!))}
+                    className="h-10 shrink-0 rounded-lg border border-red-300 px-5 text-sm font-semibold text-red-600 hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950"
+                  >
+                    Stop
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    aria-label="Send message"
+                    title="Send message"
+                    disabled={!input.trim() || chat.isSavingConversationTools || chat.preferences.isSavingSettings}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-500 text-sm text-white transition-colors hover:bg-indigo-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <i aria-hidden="true" className="fa-solid fa-paper-plane" />
+                  </button>
+                )}
+              </div>
             </div>
           </form>
         </footer>

@@ -1,9 +1,9 @@
-# Home Agent — Frontend (HomeChat)
+# Home Agent â€” Frontend (HomeChat)
 
 A Next.js chat UI with durable, user-owned conversations streamed from the Home Agent FastAPI
 backend.
 
-This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the browser always calls the UI origin (`/api/...`). The proxy forwards to the backend using a runtime environment variable, which means you don’t need client-side `NEXT_PUBLIC_*` variables.
+This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the browser always calls the UI origin (`/api/...`). The proxy forwards to the backend using a runtime environment variable, which means you donâ€™t need client-side `NEXT_PUBLIC_*` variables.
 
 ---
 
@@ -11,23 +11,23 @@ This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the
 
 ```
 HomeChat/
-├── app/
-│   ├── globals.css
-│   ├── layout.tsx
-│   ├── page.tsx
-│   └── api/[...path]/route.ts   # reverse proxy to backend (runtime)
-├── components/
-│   ├── ArtifactRenderer.tsx
-│   ├── MessageList.tsx
-│   └── SettingsPanel.tsx
-├── lib/
-│   ├── api.ts                    # uses relative /api paths
-│   ├── types.ts
-│   └── useChat.ts                # NDJSON stream handling
-├── public/
-├── next.config.ts                # no build-time API rewrites
-├── package.json
-└── Dockerfile
+â”œâ”€â”€ app/
+â”‚   â”œâ”€â”€ globals.css
+â”‚   â”œâ”€â”€ layout.tsx
+â”‚   â”œâ”€â”€ page.tsx
+â”‚   â””â”€â”€ api/[...path]/route.ts   # reverse proxy to backend (runtime)
+â”œâ”€â”€ components/
+â”‚   â”œâ”€â”€ ArtifactRenderer.tsx
+â”‚   â”œâ”€â”€ MessageList.tsx
+â”‚   â””â”€â”€ SettingsPanel.tsx
+â”œâ”€â”€ lib/
+â”‚   â”œâ”€â”€ api.ts                    # uses relative /api paths
+â”‚   â”œâ”€â”€ types.ts
+â”‚   â””â”€â”€ useChat.ts                # NDJSON stream handling
+â”œâ”€â”€ public/
+â”œâ”€â”€ next.config.ts                # no build-time API rewrites
+â”œâ”€â”€ package.json
+â””â”€â”€ Dockerfile
 ```
 
 ---
@@ -80,6 +80,91 @@ composer controls. Then run the production build.
 
 ---
 
+## Settings and chat tools
+
+- The header gear opens **General** (theme/font size) and **Tools** (default tool choices).
+  Confirmed settings are stored by the backend for the current user, not only in this browser.
+- The composer's bottom-left **Tools** button controls the current chat. New chats copy current
+  defaults; explicit chat choices, including off, survive later default changes and chat reuse.
+  Legacy chats without an explicit choice inherit the user default, otherwise off.
+- Changes are shown after a successful save. Send waits for pending settings writes; failures
+  retain confirmed values and show a retry action. Changing tools does not change the model
+  or interrupt an active response. Backend run settings are captured for the next prompt.
+- Web search binds to the selected model when the saved chat choice is on; it remains off by default.
+  The temporary backend model allowlist and both outdated inactive-execution notices have been
+  removed. Owner authorization and the reviewed direct OpenAI endpoint remain required; provider
+  incompatibility is an explicit error, not an ignored switch. Existing on choices activate search
+  on the next prompt after the backend update.
+
+The UI uses the existing same-origin authenticated settings, tool catalog, and conversation APIs.
+No additional frontend environment variables, dependencies, or SQL changes are needed for these
+controls. The backend preferences migration must already be deployed when using PostgreSQL.
+
+Before acceptance, run `npm run build` and verify at desktop/mobile widths: open General/Tools,
+change theme/font/defaults, set a chat override, switch chats and reload, and confirm explicit off
+survives a global default change. Also verify model/usage/Send/Stop and keyboard focus still work.
+
+
+### Native citations and search cost
+
+Native text events may have a stable `part_id`. Repeated events with that ID are full snapshots,
+not text deltas: the hook updates the existing part in place, including late source/citation data.
+Legacy text-only streams still append normally. Restored and interrupted answers use the same path.
+Citation ranges are Unicode code points in the decoded Markdown/HTML source, not UTF-16 indices.
+
+After HTML sanitization, verified references become grouped hostname/favicon pills. Hover/focus or
+500 ms touch hold opens an interactive, viewport-clamped source dialog; normal touch is usable,
+movement/scroll cancels a pending hold, and outside/Escape closes it. Source titles/dates only appear
+when provided; ordinary links and code remain unchanged. Model previews reuse the shared hook.
+
+Favicons use the authenticated, owner/source-ID backend endpoint through the existing same-origin
+proxy. No arbitrary URL or third-party favicon request is sent from the browser; unavailable images
+use a local globe. The proxy preserves binary data and the backend's safe cache/CSP/nosniff headers.
+The backend discovers bounded public-homepage icon links and validates/pins public HTTPS targets at
+every redirect/CDN hop; scripts and SVG are not executed. It never forwards chat text, the original
+citation path/query, cookies, authorization or Referer. Target sites still see the backend IP and
+public icon requests. Icons are temporary memory-cache entries, not stored chat assets: replay may
+refetch them, and a disappeared icon leaves the source link usable with the globe fallback.
+
+The usage dialog separates **Model token cost**, observed completed searches and native call
+charges. The backend's approved policy includes search content in reported model-token usage,
+without adding a second token charge; completed, fully priced runs do not show an unverified-content
+warning. Historical missing/null attribution uses the same policy on read. **Web searches** accumulates completed search actions across all turns, excluding page opens
+and find-in-page actions. Three actual searches followed by four show seven, not four. A small
+circled info button beside **Web searches** explains search-call fees versus open/find actions and
+separate model-token charges on hover, keyboard focus or tap. With the info button focused, Escape
+dismisses the tooltip before the usage panel. Token counts remain visible independently of pricing. Missing prices, interrupted work or
+unresolved explicit separate-token billing show an incomplete estimate, not free work. The optional
+`estimated_search_call_cost_usd` subtotal displays known completed-call fees; ordinary search tokens
+are already accounted for in model usage. The optional `search_call_pricing_complete` flag is false when native work or rates are
+incomplete. After Stop and continuation, known priced calls still accumulate; partial amounts are
+labeled **Known search call fees** with an incomplete-accounting notice. Unknown fees with no priced
+completed calls remain unavailable, never a fabricated zero. Otherwise the row is **Search call
+fees**, or **Search charges** when the full tool cost is known. Older server responses without the
+flag retain their previous display. No partial fee is presented as the session total. One concise yellow notice lists the remaining unknowns. An empty model-pricing catalog needs backend configuration
+or reviewed database pricing setup, not a different model allowlist format. Totals include the
+existing title/chat/compaction semantics. Provider invoice reconciliation and the final rollout gate
+remain tracked in the backend web-search implementation plan; this policy is not an invoice audit.
+
+Hosted search uses the existing grey start and green/red result boxes when tool-call display is
+on. Headers distinguish `web_search (search)`, `web_search (open page)` and
+`web_search (find in page)` so not every hosted-tool card is mistaken for a billable search.
+Matching provider-response/call IDs prevent duplicate cards at final graph updates; persisted
+parts use the existing replay path. Cards show bounded exposed queries/actions and source metadata,
+not raw search/page bodies. The installed backend LangChain adapter forwards completed hosted-tool
+items but drops raw start/searching SSE events: currently cards normally first appear at completion,
+before the following answer, rather than indicating the exact search-start instant. No search is
+claimed just because the toggle is on. Old messages cannot gain cards retroactively from billing
+records, which deliberately omit queries. The backend no longer requests the optional exhaustive
+source inventory because weather API sources exceed the current SDK's URL-only schema; this does
+not disable answer URL citations, search actions or tool-result cards. Cards display only sources
+actually supplied by the provider and never invent a URL for an API/weather source.
+
+Before acceptance, build and test desktop/mobile citation hover, focus, long-hold, outside/Escape,
+long hostnames, grouped sources, sanitized HTML, ordinary links/code, Stop/reload and cost examples.
+
+---
+
 ## Production Build
 
 ```bash
@@ -118,7 +203,6 @@ The frontend consumes the `/api/chat/stream` endpoint (POST), which returns an *
 | `function_call_start` | Tool calls dispatched by the LLM | indexed dict of tool call objects |
 | `function_call_end` | Tool call result returned to the LLM | `tool_call_id`, `name`, `status`, `content` |
 | `ui` | Resolved UI artifact (e.g. chart, table) | `artifact` |
-| `interactive` | Resolved interactive artifact | `artifact` |
 | `monitor` | LLM token usage metadata | `input_tokens`, `output_tokens`, `total_tokens` |
 | `error` | Error emitted by the backend | error detail |
 
@@ -152,12 +236,17 @@ The `ReadableStream` from `fetch` is consumed with a `TextDecoder` in streaming 
 Consecutive `text` events are merged into a single `TextPart` in state rather than appending a new part per token. This avoids O(n) re-renders as the LLM streams long responses.
 
 ### Part-based message model
-Each `ChatMessage` holds a `parts` array instead of a single string. This maps naturally to the multi-type stream — a single assistant turn can contain reasoning blocks, tool call steps, UI artifacts, and text, all rendered in order.
+Each `ChatMessage` holds a `parts` array instead of a single string. This maps naturally to the multi-type stream â€” a single assistant turn can contain reasoning blocks, tool call steps, UI artifacts, and text, all rendered in order.
 
 ### Extensible artifact rendering
-`ui` and `interactive` parts are restored from persisted history through the same reducer used for
-live stream events. `ArtifactRenderer` renders Plotly charts and structured tables, including
-responsive overflow controls for narrow viewports.
+`ui` parts are restored from persisted history through the same reducer used for live stream
+events. `ArtifactRenderer` renders JSON Plotly charts and structured tables, including responsive
+overflow controls for narrow viewports. Legacy inline-HTML and hosted-page chart artifacts are
+blocked with an explicit warning; they are never injected into the page or loaded in an iframe.
+
+Assistant text supports GitHub-Flavored Markdown, KaTeX, clickable Markdown/HTML links, and basic
+sanitized HTML. Scripts, event handlers, iframes, and custom CSS are not supported. Fenced HTML
+is displayed as code, not executed. The unused `interactive` block/event has been removed.
 
 ### Conversation and run management
 HomeAI creates each conversation UUID and uses it as the LangGraph `thread_id`. `useChat` keeps

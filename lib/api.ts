@@ -26,3 +26,12 @@ export async function apiFetch(pathOrUrl: string, options: RequestInit = {}): Pr
 }
 
 export default apiFetch;
+
+export async function responseError(response: Response, fallback: string): Promise<Error> {
+  try {
+    const body = (await response.json()) as { detail?: string; error?: string };
+    return new Error(body.detail ?? body.error ?? fallback);
+  } catch {
+    return new Error(fallback);
+  }
+}
