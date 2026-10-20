@@ -16,6 +16,16 @@ export function ConversationUsageButton({
   contextWindowTokens: number | undefined;
 }) {
   const [open, setOpen] = useState(false);
+  const searchCost = usage?.estimated_tool_cost_usd ?? usage?.estimated_search_call_cost_usd;
+  const searchLabel = usage?.estimated_tool_cost_usd != null ? 'Search charges' : 'Search call fees';
+  const incompleteReasons: string[] = [];
+  if (usage && !usage.pricing_complete) {
+    if (usage.estimated_model_cost_usd == null) incompleteReasons.push('model rates or final usage missing');
+    if (usage.estimated_tool_cost_usd == null) {
+      incompleteReasons.push(usage.estimated_search_call_cost_usd == null
+        ? 'search-call rates or final usage missing' : 'search-content billing unverified');
+    }
+  }
   const ref = useRef<HTMLDivElement>(null);
   const limit = contextWindowTokens ?? 1_050_000;
   const percent = Math.min(
@@ -88,23 +98,13 @@ export function ConversationUsageButton({
           <dl className="mb-3 space-y-1">
             <div className="flex justify-between"><dt>Model token cost</dt><dd>{usd(usage?.estimated_model_cost_usd)}</dd></div>
             <div className="flex justify-between"><dt>Web searches</dt><dd>{usage?.web_search_calls ?? 0}</dd></div>
-            <div className="flex justify-between"><dt>Search charges</dt><dd>{usd(usage?.estimated_tool_cost_usd)}</dd></div>
+            <div className="flex justify-between"><dt>{searchLabel}</dt><dd>{usd(searchCost)}</dd></div>
           </dl>
           {usage && !usage.pricing_complete && (
-            <div className="mb-3 space-y-1 text-amber-700 dark:text-amber-300">
-              <p>Incomplete estimate: missing rates, interrupted work, or unknown search-token attribution.</p>
-              {usage.estimated_model_cost_usd == null && (
-                <p>Model cost needs effective pricing rates and completed usage. Token counts below are independent of pricing.</p>
-              )}
-              {usage.estimated_tool_cost_usd == null && (
-                <>
-                  {usage.estimated_search_call_cost_usd != null && (
-                    <p>Search call fees (excluding context): {usd(usage.estimated_search_call_cost_usd)}</p>
-                  )}
-                  <p>Search charges need call pricing, completed observations, and verified search-context billing. A search count alone is not a complete price.</p>
-                </>
-              )}
-            </div>
+            <p className="mb-3 text-amber-700 dark:text-amber-300">
+              Incomplete estimate: {incompleteReasons.join('; ') || 'billing information missing'}.
+              {' '}Token counts are still recorded.
+            </p>
           )}
           <div className="mb-3">
             <div className="mb-1 flex justify-between">

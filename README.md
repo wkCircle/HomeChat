@@ -118,12 +118,19 @@ when provided; ordinary links and code remain unchanged. Model previews reuse th
 Favicons use the authenticated, owner/source-ID backend endpoint through the existing same-origin
 proxy. No arbitrary URL or third-party favicon request is sent from the browser; unavailable images
 use a local globe. The proxy preserves binary data and the backend's safe cache/CSP/nosniff headers.
+The backend discovers bounded public-homepage icon links and validates/pins public HTTPS targets at
+every redirect/CDN hop; scripts and SVG are not executed. It never forwards chat text, the original
+citation path/query, cookies, authorization or Referer. Target sites still see the backend IP and
+public icon requests. Icons are temporary memory-cache entries, not stored chat assets: replay may
+refetch them, and a disappeared icon leaves the source link usable with the globe fallback.
 
 The usage dialog separates **Model token cost**, observed completed searches and native/context
 charges. Token counts remain visible independently of pricing. Missing prices, interrupted work or
 unknown search-token attribution show an incomplete estimate, not free work. The optional
-`estimated_search_call_cost_usd` subtotal displays known call fees excluding unresolved context;
-it never substitutes for an unknown total. An empty model-pricing catalog needs backend configuration
+`estimated_search_call_cost_usd` subtotal displays known call fees excluding unresolved context.
+When the complete charge is unknown, the main row is labeled **Search call fees** and shows that
+subtotal; when the complete tool charge is known, it remains **Search charges**. No partial fee is
+presented as the session total. One concise yellow notice lists the remaining unknowns. An empty model-pricing catalog needs backend configuration
 or reviewed database pricing setup, not a different model allowlist format. Totals include the
 existing title/chat/compaction semantics. Live OpenAI billing attribution and the final rollout gate
 are tracked in the backend web-search implementation plan.
@@ -135,7 +142,10 @@ not raw search/page bodies. The installed backend LangChain adapter forwards com
 items but drops raw start/searching SSE events: currently cards normally first appear at completion,
 before the following answer, rather than indicating the exact search-start instant. No search is
 claimed just because the toggle is on. Old messages cannot gain cards retroactively from billing
-records, which deliberately omit queries.
+records, which deliberately omit queries. The backend no longer requests the optional exhaustive
+source inventory because weather API sources exceed the current SDK's URL-only schema; this does
+not disable answer URL citations, search actions or tool-result cards. Cards display only sources
+actually supplied by the provider and never invent a URL for an API/weather source.
 
 Before acceptance, build and test desktop/mobile citation hover, focus, long-hold, outside/Escape,
 long hostnames, grouped sources, sanitized HTML, ordinary links/code, Stop/reload and cost examples.

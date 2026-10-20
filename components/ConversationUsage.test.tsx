@@ -7,7 +7,7 @@ const usage: ConversationUsage = {
   conversation_id: 'conversation', invocations: 1,
   input_tokens: 10, cached_input_tokens: 0, cache_write_tokens: 0, output_tokens: 5, total_tokens: 15,
   latest_input_tokens: 10, latest_model: 'gpt-6-luna', estimated_model_cost_usd: 0.12,
-  estimated_tool_cost_usd: 0.03, estimated_cost_usd: 0.15, web_search_calls: 3, pricing_complete: true
+  estimated_tool_cost_usd: 0.03, estimated_search_call_cost_usd: 0.03, estimated_cost_usd: 0.15, web_search_calls: 3, pricing_complete: true
 };
 
 describe('conversation search costs', () => {
@@ -22,7 +22,7 @@ describe('conversation search costs', () => {
   it('labels unknown costs as incomplete, not zero', () => {
     render(<ConversationUsageButton usage={{
       ...usage, estimated_cost_usd: null,
-      estimated_tool_cost_usd: null, pricing_complete: false
+      estimated_tool_cost_usd: null, estimated_search_call_cost_usd: null, pricing_complete: false
     }} contextWindowTokens={1000} />);
     fireEvent.click(screen.getByRole('button'));
     expect(screen.getAllByText('Unavailable')).toHaveLength(2);
@@ -34,12 +34,12 @@ describe('conversation search costs', () => {
 
 it('keeps token counts visible when pricing is unavailable and explains the difference', () => {
   render(<ConversationUsageButton usage={{
-    ...usage, estimated_model_cost_usd: null, estimated_tool_cost_usd: null,
+    ...usage, estimated_model_cost_usd: null, estimated_tool_cost_usd: null, estimated_search_call_cost_usd: null,
     estimated_cost_usd: null, pricing_complete: false,
   }} contextWindowTokens={1000} />);
   fireEvent.click(screen.getByRole('button'));
   expect(screen.getByText('Model token cost')).toBeInTheDocument();
-  expect(screen.getByText(/Token counts below are independent of pricing/)).toBeInTheDocument();
+  expect(screen.getByText(/Token counts are still recorded/)).toBeInTheDocument();
   expect(screen.getByText('Input')).toBeInTheDocument();
   expect(screen.getByText('Output')).toBeInTheDocument();
   expect(screen.getAllByText('Unavailable')).toHaveLength(3);
@@ -51,7 +51,29 @@ it('shows known search-call fees without presenting them as the complete search 
     estimated_cost_usd: null, pricing_complete: false,
   }} contextWindowTokens={1000} />);
   fireEvent.click(screen.getByRole('button'));
-  expect(screen.getByText('Search call fees (excluding context): $0.03')).toBeInTheDocument();
-  expect(screen.getAllByText('Unavailable')).toHaveLength(2);
-  expect(screen.getByText(/A search count alone is not a complete price/)).toBeInTheDocument();
+  expect(screen.getByText('Search call fees').parentElement).toHaveTextContent('$0.03');
+  expect(screen.getAllByText('Unavailable')).toHaveLength(1);
+  expect(screen.getByText(/search-content billing unverified/)).toBeInTheDocument();
+});
+
+
+it('uses one concise incomplete notice rather than several yellow explanations', () => {
+  const {container} = render(<ConversationUsageButton usage={{
+    ...usage, estimated_model_cost_usd: null, estimated_tool_cost_usd: null,
+    estimated_search_call_cost_usd: null, estimated_cost_usd: null, pricing_complete: false,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button'));
+  expect(container.querySelectorAll('p.text-amber-700')).toHaveLength(1);
+  expect(screen.getByText(/model rates or final usage missing/)).toBeInTheDocument();
+  expect(screen.getByText(/search-call rates or final usage missing/)).toBeInTheDocument();
+});
+
+it('shows zero charges only when the backend explicitly reports no charge', () => {
+  render(<ConversationUsageButton usage={{
+    ...usage, web_search_calls: 0, estimated_search_call_cost_usd: 0,
+    estimated_tool_cost_usd: 0, estimated_cost_usd: 0.12,
+  }} contextWindowTokens={1000} />);
+  fireEvent.click(screen.getByRole('button'));
+  expect(screen.getByText('Search charges').parentElement).toHaveTextContent('$0.00');
+  expect(screen.queryByText(/Incomplete estimate/)).not.toBeInTheDocument();
 });
