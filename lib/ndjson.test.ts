@@ -82,3 +82,24 @@ it.each([1, 3, 4096])('replays hosted tool cards from split/coalesced %i-byte ND
   const restored = events.reduce<import('./types').MessagePart[]>(routeEvent, []);
   expect(parts).toEqual(restored);
 });
+
+
+it.each([1, 7, 4096])('replays legacy and columnar table events across %i-byte chunks', async (size) => {
+  const { routeEvent } = await import('./useChat');
+  const artifacts = [
+    { type: 'table', data: { columns: ['name'], rows: [{ name: '中文' }] } },
+    { type: 'table', schema_version: 2, data: { dataset: {
+      type: 'tabular_data', schema_version: 1, format: 'json', orientation: 'columns',
+      columns: ['name'], data: { name: ['中文'] },
+    } } },
+  ];
+  const events: StreamEvent[] = artifacts.map((artifact) => ({ type: 'ui', content: { artifact }, metadata: {} }));
+  const bytes = new TextEncoder().encode(events.map((event) => JSON.stringify(event)).join('\n') + '\n');
+  const parser = new NdjsonParser<StreamEvent>();
+  const parsed: StreamEvent[] = [];
+  for (let index = 0; index < bytes.length; index += size) parsed.push(...parser.push(bytes.slice(index, index + size)));
+  parsed.push(...parser.finish());
+  expect(parsed.reduce<import('./types').MessagePart[]>(routeEvent, [])).toEqual(
+    artifacts.map((artifact) => ({ type: 'ui', artifact })),
+  );
+});

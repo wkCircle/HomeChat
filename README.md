@@ -1,9 +1,9 @@
-# Home Agent â€” Frontend (HomeChat)
+# Home Agent - Frontend (HomeChat)
 
 A Next.js chat UI with durable, user-owned conversations streamed from the Home Agent FastAPI
 backend.
 
-This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the browser always calls the UI origin (`/api/...`). The proxy forwards to the backend using a runtime environment variable, which means you donâ€™t need client-side `NEXT_PUBLIC_*` variables.
+This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the browser always calls the UI origin (`/api/...`). The proxy forwards to the backend using a runtime environment variable, which means you don't need client-side `NEXT_PUBLIC_*` variables.
 
 ---
 
@@ -11,23 +11,23 @@ This app uses a server-side reverse proxy at `app/api/[...path]/route.ts` so the
 
 ```
 HomeChat/
-â”œâ”€â”€ app/
-â”‚   â”œâ”€â”€ globals.css
-â”‚   â”œâ”€â”€ layout.tsx
-â”‚   â”œâ”€â”€ page.tsx
-â”‚   â””â”€â”€ api/[...path]/route.ts   # reverse proxy to backend (runtime)
-â”œâ”€â”€ components/
-â”‚   â”œâ”€â”€ ArtifactRenderer.tsx
-â”‚   â”œâ”€â”€ MessageList.tsx
-â”‚   â””â”€â”€ SettingsPanel.tsx
-â”œâ”€â”€ lib/
-â”‚   â”œâ”€â”€ api.ts                    # uses relative /api paths
-â”‚   â”œâ”€â”€ types.ts
-â”‚   â””â”€â”€ useChat.ts                # NDJSON stream handling
-â”œâ”€â”€ public/
-â”œâ”€â”€ next.config.ts                # no build-time API rewrites
-â”œâ”€â”€ package.json
-â””â”€â”€ Dockerfile
+|-- app/
+|   |-- globals.css
+|   |-- layout.tsx
+|   |-- page.tsx
+|   `-- api/[...path]/route.ts   # reverse proxy to backend (runtime)
+|-- components/
+|   |-- ArtifactRenderer.tsx
+|   |-- MessageList.tsx
+|   `-- SettingsPanel.tsx
+|-- lib/
+|   |-- api.ts                    # uses relative /api paths
+|   |-- types.ts
+|   `-- useChat.ts                # NDJSON stream handling
+|-- public/
+|-- next.config.ts                # no build-time API rewrites
+|-- package.json
+`-- Dockerfile
 ```
 
 ---
@@ -254,7 +254,7 @@ The `ReadableStream` from `fetch` is consumed with a `TextDecoder` in streaming 
 Consecutive `text` events are merged into a single `TextPart` in state rather than appending a new part per token. This avoids O(n) re-renders as the LLM streams long responses.
 
 ### Part-based message model
-Each `ChatMessage` holds a `parts` array instead of a single string. This maps naturally to the multi-type stream â€” a single assistant turn can contain reasoning blocks, tool call steps, UI artifacts, and text, all rendered in order.
+Each `ChatMessage` holds a `parts` array instead of a single string. This maps naturally to the multi-type stream - a single assistant turn can contain reasoning blocks, tool call steps, UI artifacts, and text, all rendered in order.
 
 ### Extensible artifact rendering
 `ui` parts are restored from persisted history through the same reducer used for live stream
@@ -286,3 +286,16 @@ opening a different chat. Access is still enforced by the backend; the URL is no
 The model selector belongs to the composer, not stored conversation metadata. HomeChat sends the
 current model explicitly with every run and does not change the selection when switching
 conversations.
+
+
+## Tables and saved history
+
+Tables use a compact, versioned columnar format. Legacy saved tables remain readable without
+rewriting history. Pagination, fullscreen and full-table CSV export remain available; CSV is
+created only when requested. Invalid table data shows an explicit error.
+
+Format compatibility lives in [tabular.ts](lib/tabular.ts); table presentation lives in
+[TableArtifact.tsx](components/TableArtifact.tsx).
+
+Deploy this compatible frontend before the updated HomeAI/HomeMCP producers. No database migration
+or history rewrite is required.

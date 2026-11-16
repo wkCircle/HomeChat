@@ -210,3 +210,30 @@ export interface ConversationHistory {
   messages: StoredMessage[];
   truncated: boolean;
 }
+
+
+/** Canonical dataset contract mirrored from HomeAI shared.tabular.TabularDataset. */
+export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+
+export interface TabularDataset {
+  type: 'tabular_data';
+  schema_version: 1;
+  format: 'json';
+  orientation: 'columns';
+  columns: string[];
+  data: Record<string, JsonValue[]>;
+}
+
+export interface TableArtifactV2 {
+  type: 'table';
+  schema_version: 2;
+  renderer: 'dash-chat';
+  format: 'json';
+  encoding: 'utf-8';
+  data: {
+    title: string;
+    dataset: TabularDataset;
+    labels: string[];
+    props: { striped?: boolean; hover?: boolean; bordered?: boolean; responsive?: boolean; size?: string };
+  };
+}
