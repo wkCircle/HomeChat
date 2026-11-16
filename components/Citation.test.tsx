@@ -50,3 +50,22 @@ it('rejects malformed ranges and unsafe source URLs explicitly', () => {
   })).toThrow('Invalid citation range');
   expect(() => routeEvent([], { type: 'text', metadata: {}, content: { text: 'Claim', sources: [{ ...source, url: 'javascript:alert(1)' }] } })).toThrow('Unsafe');
 });
+
+
+it('keeps an unavailable icon fallback across rerenders and retries only for a changed endpoint', () => {
+  const { container, rerender } = render(<CitationGroup sources={[source]} conversationId="chat-a" />);
+  const image = container.querySelector('img')!;
+  expect(image).toHaveAttribute('src', '/api/chat/conversations/chat-a/sources/web_source/favicon');
+  fireEvent.error(image);
+  expect(container.querySelector('img')).toBeNull();
+  const fallback = container.querySelector('.fa-globe')!.parentElement;
+  expect(fallback).toHaveClass('h-4', 'w-4', 'shrink-0');
+  rerender(<CitationGroup sources={[{ ...source }]} conversationId="chat-a" />);
+  expect(container.querySelector('.fa-globe')!.parentElement).toBe(fallback);
+  expect(container.querySelector('img')).toBeNull();
+  rerender(<CitationGroup sources={[source]} conversationId="chat-b" />);
+  expect(container.querySelector('img')).toHaveAttribute('src', '/api/chat/conversations/chat-b/sources/web_source/favicon');
+  fireEvent.error(container.querySelector('img')!);
+  rerender(<CitationGroup sources={[{ ...source, id: 'new-source' }]} conversationId="chat-b" />);
+  expect(container.querySelector('img')).toHaveAttribute('src', '/api/chat/conversations/chat-b/sources/new-source/favicon');
+});

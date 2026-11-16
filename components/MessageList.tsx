@@ -1,8 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkCjkFriendly from 'remark-cjk-friendly/parseOnly';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeRaw from 'rehype-raw';
@@ -14,6 +15,8 @@ import { CitationGroup } from './Citation';
 import { citationPlugin } from '@/lib/citations';
 import type {
   ChatMessage,
+  CitationSource,
+  TextPart,
   FuncCallEndPart,
   FuncCallStartPart,
   MonitorPart,
@@ -145,7 +148,34 @@ function MonitorBlock({ part }: { part: MonitorPart }) {
 
 // ─── Single message ───────────────────────────────────────────────────────────
 
-function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick, conversationId }: { msg: ChatMessage; isLoading?: boolean; isCompacting?: boolean; onAvatarClick?: () => void; conversationId?: string }) {
+const CitationContext = createContext<{ sources: CitationSource[]; conversationId?: string }>({ sources: [] });
+
+const markdownComponents: Components = {
+  cite: function MarkdownCitation({ node, children }) {
+    const { sources, conversationId } = useContext(CitationContext);
+    const ids = node?.properties.dataSourceIds;
+    const matched = Array.isArray(ids) ? sources.filter(source => ids.includes(source.id)) : [];
+    return matched.length ? <CitationGroup sources={matched} conversationId={conversationId} /> : <cite>{children}</cite>;
+  },
+  a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" />,
+};
+const remarkPlugins = [remarkGfm, remarkMath, remarkCjkFriendly];
+
+const AssistantText = memo(function AssistantText({ part, conversationId }: { part: TextPart; conversationId?: string }) {
+  const citations = useMemo(() => ({ sources: part.sources ?? [], conversationId }), [part.sources, conversationId]);
+  const rehypePlugins = useMemo(() => [rehypeRaw, rehypeSanitize, citationPlugin(part), rehypeKatex], [part]);
+  return (
+    <div className="prose prose-sm min-w-0 max-w-full break-words dark:prose-invert prose-pre:whitespace-pre-wrap">
+      <CitationContext.Provider value={citations}>
+        <ReactMarkdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={markdownComponents}>
+          {part.text}
+        </ReactMarkdown>
+      </CitationContext.Provider>
+    </div>
+  );
+});
+
+const AssistantMessage = memo(function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick, conversationId }: { msg: ChatMessage; isLoading?: boolean; isCompacting?: boolean; onAvatarClick?: () => void; conversationId?: string }) {
   // Build set of tool_call_ids that have a matching func_call_end part
   const resolvedIds = new Set(
     msg.parts
@@ -167,24 +197,7 @@ function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick, convers
         {msg.parts.map((part, i) => {
           switch (part.type) {
             case StreamTypeEnum.TEXT:
-              return (
-                <div key={i} className="prose prose-sm min-w-0 max-w-full break-words dark:prose-invert prose-pre:whitespace-pre-wrap">
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeRaw, rehypeSanitize, citationPlugin(part), rehypeKatex]}
-                    components={{
-                      cite: ({node, children}) => {
-                        const ids = node?.properties.dataSourceIds;
-                        const sources = Array.isArray(ids) ? (part.sources ?? []).filter(source => ids.includes(source.id)) : [];
-                        return sources.length ? <CitationGroup sources={sources} conversationId={conversationId}/> : <cite>{children}</cite>;
-                      },
-                      a: ({node: _node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"/>,
-                    }}
-                  >
-                    {part.text}
-                  </ReactMarkdown>
-                </div>
-              );
+              return <AssistantText key={i} part={part} conversationId={conversationId} />;
             case StreamTypeEnum.REASONING:
               return <ReasoningBlock key={i} text={part.text} />;
             case StreamTypeEnum.FUNC_CALL_START: {
@@ -230,9 +243,9 @@ function AssistantMessage({ msg, isLoading, isCompacting, onAvatarClick, convers
       </div>
     </div>
   );
-}
+});
 
-function UserMessage({ msg }: { msg: ChatMessage }) {
+const UserMessage = memo(function UserMessage({ msg }: { msg: ChatMessage }) {
   const text = msg.parts.find((p) => p.type === 'text')?.text ?? '';
   return (
     <div className="flex justify-end">
@@ -241,12 +254,13 @@ function UserMessage({ msg }: { msg: ChatMessage }) {
       </div>
     </div>
   );
-}
+});
 
 // ─── List ─────────────────────────────────────────────────────────────────────
 
-export function MessageList({ messages, isLoading, isCompacting, conversationId }: { messages: ChatMessage[]; isLoading?: boolean; isCompacting?: boolean; conversationId?: string }) {
+export const MessageList = memo(function MessageList({ messages, isLoading, isCompacting, conversationId }: { messages: ChatMessage[]; isLoading?: boolean; isCompacting?: boolean; conversationId?: string }) {
   const [isAvatarOpen, setIsAvatarOpen] = useState(false);
+  const openAvatar = useCallback(() => setIsAvatarOpen(true), []);
   return (
     <div className="space-y-4">
       {messages.map((msg, i) => {
@@ -260,7 +274,7 @@ export function MessageList({ messages, isLoading, isCompacting, conversationId 
             conversationId={conversationId}
             isLoading={isLastMsg ? isLoading : false}
             isCompacting={isLastMsg ? isCompacting : false}
-            onAvatarClick={() => setIsAvatarOpen(true)}
+            onAvatarClick={openAvatar}
           />
         );
       })}
@@ -272,4 +286,4 @@ export function MessageList({ messages, isLoading, isCompacting, conversationId 
       />
     </div>
   );
-}
+});

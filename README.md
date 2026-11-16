@@ -105,6 +105,23 @@ change theme/font/defaults, set a chat override, switch chats and reload, and co
 survives a global default change. Also verify model/usage/Send/Stop and keyboard focus still work.
 
 
+### Chat rendering and typing
+
+Draft edits do not reparse or remount unchanged history. Completed messages and text parts are
+memoized, and Markdown component identities stay stable when streaming snapshots update sources.
+Citation previews and icon failure state therefore survive normal text updates. The composer
+uses native CSS `field-sizing: content` where supported: the browser grows or shrinks it on wrapped
+lines, explicit newlines, deletion, clearing/restoring drafts, and width changes, within the existing
+minimum/maximum height. There are no JavaScript height measurements per keystroke in this path.
+Older browsers retain one bounded measurement per edit and remeasure on width changes; their lack
+of native content sizing makes a measurement necessary to detect wrapping reliably.
+
+Markdown uses `remark-cjk-friendly/parseOnly` after GFM to support bold/emphasis next to Chinese,
+Japanese, and Korean punctuation without requiring spaces. Ordered and unordered lists, math,
+escaped delimiters, and code retain their existing behavior. The parser does not rewrite stored
+text or shift the original Unicode citation ranges; HTML still goes through sanitization.
+After pulling this change, run `npm ci` and rebuild HomeChat to install the locked parser dependency.
+
 ### Native citations and search cost
 
 Native text events may have a stable `part_id`. Repeated events with that ID are full snapshots,
@@ -119,9 +136,10 @@ when provided; ordinary links and code remain unchanged. Model previews reuse th
 
 Favicons use the authenticated, owner/source-ID backend endpoint through the existing same-origin
 proxy. No arbitrary URL or third-party favicon request is sent from the browser; unavailable images
-use a local globe. The proxy preserves binary data and the backend's safe cache/CSP/nosniff headers.
-The backend discovers bounded public-homepage icon links and validates/pins public HTTPS targets at
-every redirect/CDN hop; scripts and SVG are not executed. It never forwards chat text, the original
+use a same-size local globe, without repeated retries on draft edits. The proxy preserves binary data and the backend's safe cache/CSP/nosniff headers.
+The backend reads at most 256 KiB of the public homepage to discover declared icon links, even
+when the full page is larger; icon downloads still require complete bodies of at most 128 KiB.
+It validates/pins public HTTPS targets at every redirect/CDN hop; scripts and SVG are not executed. It never forwards chat text, the original
 citation path/query, cookies, authorization or Referer. Target sites still see the backend IP and
 public icon requests. Icons are temporary memory-cache entries, not stored chat assets: replay may
 refetch them, and a disappeared icon leaves the source link usable with the globe fallback.

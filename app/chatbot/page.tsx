@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ConversationSidebar } from '@/components/ConversationSidebar';
 import { ConversationUsageButton } from '@/components/ConversationUsage';
 import { MessageList } from '@/components/MessageList';
@@ -30,6 +30,7 @@ export default function ChatPage() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const nativeTextareaSizing = useRef(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem('homechat:sidebar:collapsed');
@@ -72,18 +73,39 @@ export default function ChatPage() {
     };
   }, []);
 
-  const adjustTextareaHeight = () => {
+  const adjustTextareaHeight = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = 'auto';
     const maximumHeight = 160;
-    textarea.style.height = `${Math.min(textarea.scrollHeight, maximumHeight)}px`;
-    textarea.style.overflowY = textarea.scrollHeight > maximumHeight ? 'auto' : 'hidden';
-  };
+    const contentHeight = textarea.scrollHeight;
+    textarea.style.height = `${Math.min(contentHeight, maximumHeight)}px`;
+    textarea.style.overflowY = contentHeight > maximumHeight ? 'auto' : 'hidden';
+  }, []);
 
-  useEffect(() => {
-    adjustTextareaHeight();
-  }, [input]);
+  useLayoutEffect(() => {
+    nativeTextareaSizing.current = typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+      && CSS.supports('field-sizing', 'content');
+    if (nativeTextareaSizing.current) return;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', adjustTextareaHeight);
+      return () => window.removeEventListener('resize', adjustTextareaHeight);
+    }
+    let previousWidth: number | undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry || entry.contentRect.width === previousWidth) return;
+      previousWidth = entry.contentRect.width;
+      adjustTextareaHeight();
+    });
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [adjustTextareaHeight]);
+
+  useLayoutEffect(() => {
+    if (!nativeTextareaSizing.current) adjustTextareaHeight();
+  }, [input, adjustTextareaHeight]);
 
   useEffect(() => {
     const checkInputMode = () => {
@@ -228,11 +250,10 @@ export default function ChatPage() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              onInput={adjustTextareaHeight}
               placeholder="Message Pikachu HomeAI"
               enterKeyHint={isMobileInputMode ? 'enter' : 'send'}
               rows={1}
-              className="block max-h-40 min-h-11 w-full resize-none bg-transparent px-2 py-2 text-sm text-gray-900 focus:outline-none dark:text-gray-100 dark:placeholder:text-gray-400"
+              className="block max-h-40 min-h-11 w-full resize-none overflow-y-auto bg-transparent px-2 py-2 text-sm text-gray-900 [field-sizing:content] focus:outline-none dark:text-gray-100 dark:placeholder:text-gray-400"
             />
             <div className="flex items-center justify-between gap-1">
               <ToolsMenu key={chat.selectedConversationId ?? 'draft'}

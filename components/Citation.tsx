@@ -5,11 +5,13 @@ import { useHoverPreview } from '@/lib/useHoverPreview';
 import type { CitationSource } from '@/lib/types';
 
 function SourceIcon({ source, conversationId }: { source: CitationSource; conversationId?: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!conversationId || failed) return <i aria-hidden="true" className="fa-solid fa-globe text-gray-400" />;
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const src = conversationId
+    ? `/api/chat/conversations/${encodeURIComponent(conversationId)}/sources/${encodeURIComponent(source.id)}/favicon`
+    : null;
+  if (!src || failedSrc === src) return <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center"><i className="fa-solid fa-globe text-gray-400" /></span>;
   return <img alt="" width={16} height={16} className="inline-block h-4 w-4 shrink-0" referrerPolicy="no-referrer"
-    src={`/api/chat/conversations/${encodeURIComponent(conversationId)}/sources/${encodeURIComponent(source.id)}/favicon`}
-    onError={() => setFailed(true)} />;
+    src={src} onError={() => setFailedSrc(src)} />;
 }
 
 export function CitationGroup({ sources, conversationId }: { sources: CitationSource[]; conversationId?: string }) {
