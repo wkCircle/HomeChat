@@ -205,14 +205,20 @@ describe('useChat stop behavior', () => {
     expect(apiFetchMock.mock.calls.some(([, options]) => options?.method === 'PATCH')).toBe(false);
   });
 
-  it('restores persisted chart and table artifacts from conversation history', async () => {
+  it.each(['legacy', 'columnar'])('restores persisted chart and %s table artifacts from conversation history', async (version) => {
     const chart = {
       type: 'graph', renderer: 'plotly', format: 'json',
       data: { props: { figure: { data: [{ type: 'bar', x: ['A'], y: [3] }] } } },
     };
-    const table = {
+    const table = version === 'legacy' ? {
       type: 'table',
       data: { title: 'Stored table', columns: ['name', 'value'], rows: [{ name: 'A', value: 3 }] },
+    } : {
+      type: 'table', schema_version: 2, renderer: 'dash-chat', format: 'json',
+      data: { title: 'Stored table', labels: ['Name', 'Value'], dataset: {
+        type: 'tabular_data', schema_version: 1, format: 'json', orientation: 'columns',
+        columns: ['name', 'value'], data: { name: ['A'], value: [3] },
+      } },
     };
     initializeResponses({
       conversation,

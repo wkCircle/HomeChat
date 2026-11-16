@@ -1,0 +1,228 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { parseTableArtifact, tableCellText, tableToCsv, type TableView } from '@/lib/tabular';
+
+export default function TableArtifact({ artifact }: { artifact: Record<string, unknown> }) {
+  const result = useMemo(() => {
+    try { return { table: parseTableArtifact(artifact) }; }
+    catch (error) { return { error: error instanceof Error ? error.message : 'Invalid table payload.' }; }
+  }, [artifact]);
+  if (!result.table) return <p role="alert">Unable to render table: {result.error}</p>;
+  return <TableViewer table={result.table} />;
+}
+
+function TableViewer({ table }: { table: TableView }) {
+  const { title, props, columns: columnKeys, labels: columnLabels } = table;
+  const striped = Boolean(props['striped']);
+  const hover = Boolean(props['hover']);
+  const bordered = Boolean(props['bordered']);
+  const responsive = props['responsive'] !== false; // default true
+  const size = typeof props['size'] === 'string' ? props['size'] : 'sm';
+
+  const textSize = size === 'sm' ? 'text-xs' : size === 'lg' ? 'text-sm' : 'text-xs';
+  const tableBorder = bordered ? 'border border-gray-200' : '';
+  const trBase = `${striped ? 'odd:bg-white even:bg-gray-50' : ''} ${hover ? 'hover:bg-gray-100' : ''}`.trim();
+
+  const [copied, setCopied] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+  const doCopy = async () => {
+    setActionError('');
+    try {
+      const csv = tableToCsv(table);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(csv);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = csv;
+        document.body.appendChild(textarea);
+        try {
+          textarea.select();
+          if (!document.execCommand('copy')) throw new Error('Clipboard copy was refused.');
+        } finally { textarea.remove(); }
+      }
+      setCopied(true);
+      if (copyTimer.current) clearTimeout(copyTimer.current);
+      copyTimer.current = setTimeout(() => setCopied(false), 1500);
+    } catch { setActionError('Unable to copy the table. Try downloading CSV instead.'); }
+  };
+  const doDownload = () => {
+    setActionError('');
+    try {
+      const filename = ((title || 'table').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'table') + '.csv';
+      const url = URL.createObjectURL(new Blob([tableToCsv(table)], { type: 'text/csv;charset=utf-8' }));
+      const anchor = document.createElement('a');
+      try {
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+      } finally { anchor.remove(); URL.revokeObjectURL(url); }
+    } catch { setActionError('Unable to download the table as CSV.'); }
+  };
+
+  // Local fullscreen + pagination state
+  const [open, setOpen] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [page, setPage] = useState<number>(1);
+
+  const totalRows = table.rowCount;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIdx = (currentPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, totalRows);
+
+  const renderTable = (inFullscreen = false) => {
+    const visibleRows = Array.from({ length: endIdx - startIdx }, (_, index) => startIdx + index);
+    return (
+      <div className={`w-full max-w-full ${responsive ? 'overflow-auto' : ''} rounded border border-gray-200`} style={{ touchAction: 'pan-x pan-y' }}>
+        {/* Toolbar that shares scroll width with the table */}
+        <div className="flex flex-col gap-2 border-b bg-gray-50 px-2 py-1 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left: actions */}
+          <div className="flex flex-wrap items-center gap-1">
+            <button
+              type="button"
+              onClick={doCopy}
+              title={copied ? 'Copied!' : 'Copy as CSV'}
+              aria-label="Copy as CSV"
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100"
+            >
+              {/* Copy icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 7.5V6A2.25 2.25 0 0 1 10.5 3.75h7.5A2.25 2.25 0 0 1 20.25 6v9A2.25 2.25 0 0 1 18 17.25h-1.5M8.25 7.5H6A2.25 2.25 0 0 0 3.75 9.75v7.5A2.25 2.25 0 0 0 6 19.5h7.5A2.25 2.25 0 0 0 15.75 17.25v-1.5" />
+              </svg>
+              <span>{copied ? 'Copied' : 'Copy'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={doDownload}
+              title="Download CSV"
+              aria-label="Download CSV"
+              className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100"
+            >
+              {/* Download icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M7.5 10.5 12 15m0 0 4.5-4.5M12 15V3" />
+              </svg>
+              <span>Download</span>
+            </button>
+            {!inFullscreen && (
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                title="Fullscreen"
+                aria-label="Open fullscreen table"
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-700 hover:bg-gray-100"
+              >
+                {/* Expand icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-4 w-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9V5.25A1.5 1.5 0 0 1 5.25 3.75H9M15 3.75h3.75a1.5 1.5 0 0 1 1.5 1.5V9M20.25 15v3.75a1.5 1.5 0 0 1-1.5 1.5H15M9 20.25H5.25a1.5 1.5 0 0 1-1.5-1.5V15" />
+                </svg>
+                <span>Fullscreen</span>
+              </button>
+            )}
+          </div>
+          {/* Right: showing, page size, pagination */}
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-600">
+            <span className="hidden sm:inline">Showing {totalRows ? startIdx + 1 : 0}–{endIdx} of {totalRows} rows</span>
+            <label className="flex items-center gap-1">
+              <span className="hidden sm:inline">Rows per page</span>
+              <select
+                value={pageSize}
+                aria-label="Rows per page"
+                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+                className="rounded border border-gray-300 bg-white px-1 py-0.5 text-[11px] shadow-sm focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="inline-flex items-center rounded px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+                aria-label="Previous page"
+              >
+                Prev
+              </button>
+              <span className="tabular-nums">{currentPage}/{totalPages}</span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="inline-flex items-center rounded px-2 py-0.5 text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-40"
+                aria-label="Next page"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+        <table className={`min-w-full table-auto text-left ${textSize} ${tableBorder}`}>
+          {title ? (
+            <caption className="caption-top border-b bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 text-left">
+              {title}
+            </caption>
+          ) : null}
+          <thead className="bg-gray-50 text-gray-600">
+            <tr>
+              {columnLabels.map((label, i) => (
+                <th key={i} className={`px-2 py-1 font-medium ${bordered ? 'border border-gray-200' : ''}`}>{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className={`text-gray-700 ${bordered ? 'border-t border-gray-200' : ''}`}>
+            {totalRows === 0 && <tr><td colSpan={Math.max(columnKeys.length, 1)} className="px-2 py-3">No rows</td></tr>}
+            {visibleRows.map((r, i) => (
+              <tr key={i} className={trBase}>
+                {columnKeys.map((_, j) => (
+                  <td key={j} className={`max-w-[14rem] px-2 py-1 align-top whitespace-pre-wrap break-words ${bordered ? 'border border-gray-200' : ''}`}>{tableCellText(table.cell(r, j))}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+  const renderModal = () => {
+    if (!open) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4" onClick={() => setOpen(false)} aria-modal="true" role="dialog">
+        <div className="relative w-[min(95vw,1100px)] max-w-[95vw] rounded-xl bg-white p-2 shadow-2xl dark:bg-gray-900" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[85vh] overflow-auto">
+            {renderTable(true)}
+          </div>
+          <button
+            onClick={() => setOpen(false)}
+            aria-label="Close"
+            className="absolute -right-2 -top-2 rounded-full bg-white p-1 text-gray-700 shadow dark:bg-gray-800 dark:text-gray-200"
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {actionError && <p role="alert" className="text-sm text-red-700">{actionError}</p>}
+      {renderTable()}
+      {renderModal()}
+    </>
+  );
+}
