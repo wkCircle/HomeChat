@@ -1,7 +1,17 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { useState, type ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatMessage } from '@/lib/types';
 import { MessageList } from './MessageList';
+
+const markdownRender = vi.hoisted(() => vi.fn());
+vi.mock('react-markdown', async (original) => {
+  const { default: Markdown, ...exports } = await original<typeof import('react-markdown')>();
+  return { ...exports, default: function ObservedMarkdown(props: ComponentProps<typeof Markdown>) {
+    markdownRender();
+    return <Markdown {...props} />;
+  } };
+});
 
 vi.mock('next/image', () => ({
   default: ({ alt }: { alt: string }) => <img alt={alt} />,
@@ -150,4 +160,113 @@ it('keeps custom-tool names and legacy hosted results unchanged', () => {
   expect(screen.getByText('Called create_graph')).toBeInTheDocument();
   expect(screen.getByText('\u2713 create_graph \u2014 success')).toBeInTheDocument();
   expect(screen.getByText('\u2717 web_search \u2014 error')).toBeInTheDocument();
+});
+
+
+describe('stable history and CJK Markdown', () => {
+  it.each([
+    ['**第一，bAV 的線高，很大程度來自稅前提撥的假設。**例如每月稅後預算 €30，bAV 假設每年投入 €600，而補助退休帳戶投入 €540。如果你的實際稅務效果不是「提 €100、少領 €60」，bAV 曲線就會改變。', '第一，bAV 的線高，很大程度來自稅前提撥的假設。', 'p'],
+    ['1. **保留既有 LHT bAV 和法定退休保險。**你已有退休儲蓄基礎，不必為了「有退休金」而急買另一張保單。', '保留既有 LHT bAV 和法定退休保險。', 'ol li'],
+    ['- **重要。**下一句', '重要。', 'ul li'],
+    ['中文**「重要」**說明', '「重要」', 'p'],
+  ])('renders CJK bold without changing list structure: %s', (text, bold, parent) => {
+    const { container } = render(<MessageList messages={[{
+      id: 'cjk', role: 'assistant', parts: [{ type: 'text', text }],
+    }]} />);
+    expect(container.querySelector(`${parent} strong`)).toHaveTextContent(bold);
+    expect(container.querySelector('.prose')).not.toHaveTextContent('**');
+  });
+
+  it('preserves escaped delimiters, inline code, fenced code, and ordinary emphasis', () => {
+    const text = String.raw`\*\*重要。\*\*下一句` + '\n\n`**重要。**下一句`\n\n```text\n**重要。**下一句\n```\n\n**Ordinary bold** and *italic*';
+    const { container } = render(<MessageList messages={[{
+      id: 'literal', role: 'assistant', parts: [{ type: 'text', text }],
+    }]} />);
+    expect(container.querySelectorAll('strong')).toHaveLength(1);
+    expect(container.querySelector('strong')).toHaveTextContent('Ordinary bold');
+    expect(container.querySelector('em')).toHaveTextContent('italic');
+    expect(container.querySelector('p')).toHaveTextContent('**重要。**下一句');
+    expect(container.querySelector('p code')).toHaveTextContent('**重要。**下一句');
+    expect(container.querySelector('pre code')).toHaveTextContent('**重要。**下一句');
+  });
+
+  it('does not mutate history DOM or lose citation state when a parent draft changes', () => {
+    const text = 'Claim [Source](https://example.com/source)';
+    const messages: ChatMessage[] = [{ id: 'history', role: 'assistant', parts: [{
+      type: 'text', text,
+      sources: [{ id: 'source', url: 'https://example.com/source', hostname: 'example.com' }],
+      citations: [{ source_id: 'source', start_index: 0, end_index: Array.from(text).length }],
+    }] }];
+    function DraftHarness() {
+      const [draft, setDraft] = useState('');
+      return <>
+        <textarea aria-label="Draft" value={draft} onChange={event => setDraft(event.target.value)} />
+        <MessageList messages={messages} conversationId="chat" />
+      </>;
+    }
+    const { container } = render(<DraftHarness />);
+    const button = screen.getByRole('button', { name: 'Sources: example.com' });
+    fireEvent.focus(button);
+    const dialog = screen.getByRole('dialog', { name: 'Sources' });
+    const icon = button.querySelector('img');
+    const observer = new MutationObserver(() => {});
+    observer.observe(container.querySelector('.space-y-4')!, { subtree: true, childList: true, attributes: true, characterData: true });
+    markdownRender.mockClear();
+    for (let i = 1; i <= 12; i++) fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Typing probe'.slice(0, i) } });
+    expect(markdownRender).not.toHaveBeenCalled();
+    expect(observer.takeRecords()).toHaveLength(0);
+    observer.disconnect();
+    expect(screen.getByRole('dialog', { name: 'Sources' })).toBe(dialog);
+    expect(button.querySelector('img')).toBe(icon);
+  });
+
+  it('retains citation state across streaming snapshots and renders updated text', () => {
+    const source = { id: 'a', url: 'https://example.com/a', hostname: 'example.com' };
+    const message: ChatMessage = { id: 'stream', role: 'assistant', parts: [{
+      type: 'text', text: 'Claim', sources: [source],
+      citations: [{ source_id: 'a', start_index: 0, end_index: 5 }],
+    }] };
+    const { rerender } = render(<MessageList messages={[message]} conversationId="chat" isLoading />);
+    const button = screen.getByRole('button', { name: 'Sources: example.com' });
+    const icon = button.querySelector('img');
+    fireEvent.focus(button);
+    rerender(<MessageList messages={[{ ...message, parts: [{
+      type: 'text', text: 'Claim. Next', sources: [{ ...source, title: 'Updated title' }],
+      citations: [{ source_id: 'a', start_index: 0, end_index: 5 }],
+    }] }]} conversationId="chat" isLoading />);
+    expect(screen.getByText(/Next/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sources: example.com' })).toBe(button);
+    expect(button.querySelector('img')).toBe(icon);
+    expect(screen.getByRole('dialog', { name: 'Sources' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Updated title/ })).toBeInTheDocument();
+  });
+});
+
+
+it('preserves original Unicode citation offsets around CJK bold and math', () => {
+  const text = '\u{1f600} **重要。**下一句 $x^2$';
+  const { container } = render(<MessageList conversationId="chat" messages={[{
+    id: 'cjk-cited', role: 'assistant', parts: [{ type: 'text', text,
+      sources: [{ id: 'a', url: 'https://example.com/a', hostname: 'example.com' }],
+      citations: [{ source_id: 'a', start_index: 2, end_index: Array.from('\u{1f600} **重要。**').length }],
+    }],
+  }]} />);
+  const bold = container.querySelector('strong');
+  expect(bold).toHaveTextContent('重要。');
+  expect(bold?.querySelector('button')).toBeNull();
+  expect(bold?.nextElementSibling?.querySelector('button')).toHaveAccessibleName('Sources: example.com');
+  expect(container.querySelector('.katex')).toBeInTheDocument();
+  expect(screen.getByText(/下一句/)).toBeInTheDocument();
+});
+
+
+it('reparses only the changed text part when a later assistant turn streams', () => {
+  const history: ChatMessage = { id: 'history', role: 'assistant', parts: [{ type: 'text', text: '**Previous answer**' }] };
+  const current: ChatMessage = { id: 'current', role: 'assistant', parts: [{ type: 'text', text: 'Current answer' }] };
+  const { rerender } = render(<MessageList messages={[history, current]} isLoading />);
+  markdownRender.mockClear();
+  rerender(<MessageList messages={[history, { ...current, parts: [{ type: 'text', text: 'Current answer updated' }] }]} isLoading />);
+  expect(markdownRender).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('Previous answer')).toBeInTheDocument();
+  expect(screen.getByText('Current answer updated')).toBeInTheDocument();
 });
